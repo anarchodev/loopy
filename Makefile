@@ -2,7 +2,8 @@
 	
 CFLAGS = -Ivendor/libuv/include -Wextra -pedantic -g3 \
          -fsanitize=address,undefined -O0 -std=gnu23 \
-         -Ivendor/sqlite/ -Wall -Ivendor/quickjs -D_GNU_SOURCE=1
+         -Ivendor/sqlite/ -Wall -Ivendor/quickjs -D_GNU_SOURCE=1 \
+         -fuse-ld=mold
 
 all: loopy
 
@@ -16,13 +17,16 @@ PQ_A = vendor/postgres/src/interfaces/libpq/libpq.a
 QUICKJS_A = vendor/quickjs/libquickjs.a
 SQLITE_A = vendor/sqlite/libsqlite3.a
 
-$(UV_A):
+vendor/sqlite/configure:
+	git submodule update --init --recursive
+
+$(UV_A): 
 	cd vendor/libuv; cmake -B build; cmake --build build
 
 $(QUICKJS_A):
 	cd vendor/quickjs/; make MAKELEVEL=0
 
-$(SQLITE_A):
+$(SQLITE_A): vendor/sqlite/configure
 	cd vendor/sqlite/; ./configure; make MAKELEVEL=0
 
 $(PQ_A):
@@ -30,13 +34,11 @@ $(PQ_A):
 
 
 ## loopy
-LOOPY_OBJS = loopy/loopy.o $(UV_A) \
-             $(SQLITE_A) \
-             $(QUICKJS_A) \
-             $(PQ_A)
+LOOPY_OBJS = loopy/loopy.o
+LOOPY_LIBS = $(SQLITE_A) $(QUICKJS_A) $(PQ_A) $(UV_A)
 
 loopy: bin/loopy
 
-bin/loopy: $(LOOPY_OBJS)
-	$(CC) $(CFLAGS) $(LOOPY_OBJS) -o $@
+bin/loopy: $(LOOPY_LIBS) $(LOOPY_OBJS)
+	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(LOOPY_LIBS) -o $@
 
