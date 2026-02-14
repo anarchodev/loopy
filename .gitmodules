@@ -7,12 +7,12 @@
 [submodule "vendor/postgres"]
 	path = vendor/postgres
 	url = git@github.com:postgres/postgres.git
-[submodule "vendor/stc"]
-	path = vendor/stc
-	url = git@github.com:stclib/STC.git
 [submodule "vendor/picohttpparser"]
 	path = vendor/picohttpparser
 	url = git@github.com:h2o/picohttpparser.git
 [submodule "vendor/libuv"]
 	path = vendor/libuv
 	url = git@github.com:libuv/libuv.git
+[submodule "vendor/CC"]
+	path = vendor/CC
+	url = git@github.com:JacksonAllan/CC.git
