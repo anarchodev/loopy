@@ -10,28 +10,33 @@ clean:
 	find . -type f -name "*.o" -not -path "./vendor*" -exec rm {} \;
 	rm bin/*
 
+## vendor
+UV_A = vendor/libuv/build/libuv.a
+PQ_A = vendor/postgres/src/interfaces/libpq/libpq.a
+QUICKJS_A = vendor/quickjs/libquickjs.a
+SQLITE_A = vendor/sqlite/libsqlite3.a
+
+$(UV_A):
+	cd vendor/libuv; cmake -B build; cmake --build build
+
+$(QUICKJS_A):
+	cd vendor/quickjs/; make MAKELEVEL=0
+
+$(SQLITE_A):
+	cd vendor/sqlite/; ./configure; make MAKELEVEL=0
+
+$(PQ_A):
+	cd vendor/postgres/; ./configure; cd src/interfaces/libpq/; make MAKELEVEL=0
+
+
 ## loopy
-LOOPY_OBJS = loopy/loopy.o \
-             $(UV_A) \
-             vendor/quickjs/libquickjs.a \
-             vendor/postgres/src/interfaces/libpq/libpq.a
+LOOPY_OBJS = loopy/loopy.o $(UV_A) \
+             $(SQLITE_A) \
+             $(QUICKJS_A) \
+             $(PQ_A)
 
 loopy: bin/loopy
 
 bin/loopy: $(LOOPY_OBJS)
 	$(CC) $(CFLAGS) $(LOOPY_OBJS) -o $@
-
-## vendor
-UV_A = vendor/libuv/build/libuv.a
-PQ_A = vendor/postgres/src/interfaces/libpq/libpq.a
-QUICKJS_A = vendor/quickjs/libquickjs.a
-
-UV_A:
-	cd vendor/libuv; cmake -B build; cmake --build build
-
-PQ_A:
-	cd vendor/quickjs/; make MAKELEVEL=0
-
-QUICKJS_A:
-	cd vendor/postgres/; ./configure; cd src/interfaces/libpq/; make MAKELEVEL=0
 
