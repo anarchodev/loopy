@@ -1,4 +1,5 @@
 CompileFlags:
   Add: [-Ivendor/libuv/include, -Ivendor/sqlite, -Wextra, -pedantic, -Werror,
-        -Wall,  -std=gnu23, -D_XOPEN_SOURCE=700, -Ivendor/quickjs]
+        -Wall,  -Ibase, -std=gnu23, -D_XOPEN_SOURCE=700, -Ivendor/quickjs,
+        -Ivendor/picohttpparser, -I.]
 

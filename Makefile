@@ -1,9 +1,9 @@
-.PHONY: all clean loopy
+.PHONY: all clean loopy test
 	
-CFLAGS = -Ivendor/libuv/include -Wextra -pedantic -g3 \
-         -fsanitize=address,undefined -O0 -std=gnu23 \
-         -Ivendor/sqlite/ -Wall -Ivendor/quickjs -D_GNU_SOURCE=1 \
-         -fuse-ld=mold
+CFLAGS = -Wextra -pedantic -g3 \
+         -fsanitize=address,undefined -O0 -std=c89\
+         -Wall -D_GNU_SOURCE=1 -Werror \
+         -fuse-ld=mold -I.
 
 all: loopy
 
@@ -33,12 +33,31 @@ $(PQ_A):
 	cd vendor/postgres/; ./configure; cd src/interfaces/libpq/; make MAKELEVEL=0
 
 
-## loopy
-LOOPY_OBJS = loopy/loopy.o
-LOOPY_LIBS = $(SQLITE_A) $(QUICKJS_A) $(PQ_A) $(UV_A)
+serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser -g3
+vendor/picohttpparser/%:CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser
+SERVE_OBJS = serve/serve.o vendor/picohttpparser/picohttpparser.o
+ALLOCATOR_OBJS = allocator/allocator.o
+## programs
+LOOPY_OBJS = loopy/main.o loopy/args.o  \
+
+$(LOOPY_OBJS): loopy/internal.h
 
 loopy: bin/loopy
 
-bin/loopy: $(LOOPY_LIBS) $(LOOPY_OBJS)
-	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(LOOPY_LIBS) -o $@
+             
+bin/loopy: $(UV_A) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOOPY_OBJS)
+	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(UV_A) -o $@
+
+
+LOOPY_TEST_OBJS = loopy/test.o loopy/callbacks.o
+
+$(LOOPY_TEST_OBJS): loopy/internal.h
+
+loopy-test: bin/loopy-test
+
+bin/loopy-test: $(LOOPY_TEST_OBJS)
+	$(CC) $(CFLAGS) $(LOOPY_TEST_OBJS) -o $@
+
+test: loopy-test
+	./bin/loopy-test
 
