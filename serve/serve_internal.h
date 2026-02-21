@@ -52,8 +52,4 @@ void srv_connection_cb(uv_stream_t *stream, int status);
 
 void alloc_buf(uv_handle_t *stream, size_t suggested_size, uv_buf_t *buf);
 
-str_slice_t srv_response_status_get(srv_response_t*);
-str_slice_t srv_response_headers_get(srv_response_t*);
-str_slice_t srv_response_body_get(srv_response_t*);
-
 #endif // serve_internal_h_INCLUDED

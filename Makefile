@@ -36,7 +36,7 @@ $(PQ_A):
 serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser -g3
 vendor/picohttpparser/%:CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser
 
-SERVE_OBJS = serve/serve.o vendor/picohttpparser/picohttpparser.o
+SERVE_OBJS = serve/serve.o vendor/picohttpparser/picohttpparser.o serve/req.o serve/res.o
 
 LOG_OBJS = log/log.o
 

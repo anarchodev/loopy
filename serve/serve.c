@@ -22,11 +22,13 @@ srv_i srv_new(allocator_t allocator, srv_options_t options) {
   return srv;
 }
 
-void srv_delete(srv_i srv) { srv->allocator.free(srv); }
-
-void srv_response_status_set(srv_response_t *res, int status) {
-  res->status = status;
+void close_connection_cb(uv_handle_t *stream) {
+  srv_request_t *req = stream->data;
+  req->allocator.free(stream);
+  req->allocator.free(req);
 }
+
+void srv_delete(srv_i srv) { srv->allocator.free(srv); }
 
 void free_buf(allocator_t alloc, const uv_buf_t *buf) {
   if (buf->len > 0)
@@ -43,54 +45,18 @@ void alloc_buf(uv_handle_t *stream, size_t suggested_size, uv_buf_t *buf) {
 void srv_write_cb(uv_write_t *req, int) {
   srv_response_t *res = req->data;
   res->allocator.free(res);
+  res->allocator.free(req);
 }
 
-srv_request_t *srv_request_new(allocator_t allocator, srv_request_cb cb) {
-  srv_request_t *request = allocator.malloc(sizeof(*request));
-  if (request == NULL)
-    return request;
-  request->headers_count =
-      sizeof(request->headers) / sizeof(request->headers[0]);
-  request->allocator = allocator;
-  request->request_cb = cb;
-  request->current_buffer.ptr = request->buffer;
-  request->current_buffer.len = 0;
-
-  return request;
+int srv_request_parse(srv_request_t *self) {
+  return phr_parse_request(self->buffer, self->current_buffer.len,
+                           (const char **)&self->method.ptr, &self->method.len,
+                           (const char **)&self->path.ptr, &self->path.len,
+                           &self->minor_version, self->headers,
+                           &self->headers_count, self->buffer_previous.len);
 }
-
-srv_response_t *srv_response_new(allocator_t allocator) {
-  srv_response_t *res = allocator.malloc(sizeof(*res));
-  if (res == NULL)
-    return res;
-  str_fixed_init(&res->body, str_cstring_to_slice(res->body_buffer, 0),
-                 sizeof(res->body_buffer));
-
-  str_fixed_init(&res->headers, str_cstring_to_slice(res->headers_buffer, 0),
-                 sizeof res->headers_buffer);
-
-  str_fixed_init(&res->status_line,
-                 str_cstring_to_slice(res->status_line_buffer, 0),
-                 sizeof res->status_line_buffer);
-  res->allocator = allocator;
-  return res;
-}
-
-int srv_response_headers_append(srv_response_t *res, str_slice_t header) {
-  int n;
-  n = str_fixed_append(&res->headers, header);
-  if (n < 0) {
-    return n;
-  }
-
-  return str_fixed_append(&res->headers, to_slice("\r\n"));
-}
-
-int srv_response_body_append(srv_response_t *self, str_slice_t body) {
-  return str_fixed_append(&self->body, body);
-}
-
 void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
+  log_info("asdf");
   srv_request_t *request = stream->data;
   allocator_t alloc = request->allocator;
   if (nread < 0)
@@ -104,17 +70,10 @@ void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
   }
 
   memcpy(request->buffer + request->current_buffer.len, buf->base, nread);
-
   request->buffer_previous.len = request->current_buffer.len;
   request->current_buffer.len = request->current_buffer.len + nread;
 
-  int ret = phr_parse_request(
-      request->buffer, request->current_buffer.len,
-      (const char **)&request->method.ptr, &request->method.len,
-      (const char **)&request->path.ptr, &request->path.len,
-      &request->minor_version, request->headers, &request->headers_count,
-      request->buffer_previous.len);
-
+  int ret = srv_request_parse(request);
   if (ret > 0) {
     // done
     srv_response_t *response = srv_response_new(alloc);
@@ -141,24 +100,16 @@ void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
       bufs[2] = uv_buf_init(response->body.s.ptr, response->body.s.len);
 
       uv_write(write, stream, bufs, 3, srv_write_cb);
-
-      goto done;
     }
-
-    goto done;
-
-  } else if (ret == -1) {
-    goto done;
   }
 
   free_buf(alloc, buf);
-
   return;
 
 done:
   free_buf(alloc, buf);
-  uv_close((uv_handle_t *)stream, NULL);
   uv_read_stop(stream);
+  uv_close((uv_handle_t *)stream, close_connection_cb);
 }
 
 void srv_connection_cb(uv_stream_t *stream, int status) {
@@ -200,7 +151,7 @@ static void close_loop(uv_loop_t *loop) {
 
 void srv_on_sigint(uv_signal_t *handle, int signum) {
   (void)(signum);
-  close_loop(handle->loop);
+  uv_stop(handle->loop);
 }
 
 int srv_run(srv_i srv) {
