@@ -5,6 +5,7 @@
 
 typedef struct b_allocator{
     void *(*malloc)(size_t);
+    void *(*realloc)(void*,size_t);
     void (*free)(void*);
 } allocator_t;
 
