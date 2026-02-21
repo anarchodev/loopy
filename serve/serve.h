@@ -2,6 +2,7 @@
 #define serve_h_INCLUDED
 
 #include "allocator/allocator.h"
+#include "str/str.h"
 
 typedef struct srv_response_s *srv_response_i;
 typedef struct srv_request_s *srv_request_i;
@@ -22,5 +23,9 @@ void srv_delete(srv_i);
 int srv_run(srv_i);
 
 srv_options_t srv_default();
+
+void srv_response_status_set(srv_response_i,int status);
+int srv_response_body_append(srv_response_i, str_slice_t body);
+int srv_response_headers_append(srv_response_i, str_slice_t header);
 
 #endif

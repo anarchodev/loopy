@@ -13,7 +13,7 @@ struct option long_opts[] = {{"host", required_argument, NULL, 'H'},
                              {"backlog", required_argument, NULL, 'b'},
                              {NULL, 0, NULL, 0}};
 
-srv_options_t parse_args(int argc, char **argv) {
+srv_options_t loopy_parse_args(int argc, char **argv) {
   srv_options_t options;
   options.backlog = 128;
   options.host = "127.0.0.1";

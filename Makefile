@@ -2,7 +2,7 @@
 	
 CFLAGS = -Wextra -pedantic -g3 \
          -fsanitize=address,undefined -O0 -std=c89\
-         -Wall -D_GNU_SOURCE=1 -Werror \
+         -Wall -D_GNU_SOURCE=1 -Werror -fanalyzer \
          -fuse-ld=mold -I.
 
 all: loopy
@@ -35,21 +35,27 @@ $(PQ_A):
 
 serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser -g3
 vendor/picohttpparser/%:CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser
+
 SERVE_OBJS = serve/serve.o vendor/picohttpparser/picohttpparser.o
+
+LOG_OBJS = log/log.o
+
 ALLOCATOR_OBJS = allocator/allocator.o
+STR_OBJS = str/str.o
+$(STR_OBJS): str/str.h
+
 ## programs
-LOOPY_OBJS = loopy/main.o loopy/args.o  \
+LOOPY_OBJS = loopy/main.o loopy/args.o
 
 $(LOOPY_OBJS): loopy/internal.h
 
 loopy: bin/loopy
-
              
-bin/loopy: $(UV_A) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOOPY_OBJS)
-	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(UV_A) -o $@
+bin/loopy: $(UV_A) $(LOG_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOOPY_OBJS)  $(STR_OBJS)
+	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOG_OBJS) $(STR_OBJS) $(UV_A) -o $@
 
 
-LOOPY_TEST_OBJS = loopy/test.o loopy/callbacks.o
+LOOPY_TEST_OBJS = loopy/test.o
 
 $(LOOPY_TEST_OBJS): loopy/internal.h
 
@@ -58,6 +64,15 @@ loopy-test: bin/loopy-test
 bin/loopy-test: $(LOOPY_TEST_OBJS)
 	$(CC) $(CFLAGS) $(LOOPY_TEST_OBJS) -o $@
 
-test: loopy-test
+str-test: bin/str-test
+
+STR_TEST_OBJS = str/str.o str/test.o
+$(STR_TEST_OBJS): str/str.h
+
+bin/str-test: $(STR_TEST_OBJS) $(ALLOCATOR_OBJS)
+	$(CC) $(CFLAGS) $(STR_TEST_OBJS) $(ALLOCATOR_OBJS) -o $@
+
+test: loopy-test str-test
+	./bin/str-test
 	./bin/loopy-test
 
