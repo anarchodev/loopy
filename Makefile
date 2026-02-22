@@ -32,15 +32,23 @@ $(SQLITE_A): vendor/sqlite/configure
 $(PQ_A):
 	cd vendor/postgres/; ./configure; cd src/interfaces/libpq/; make MAKELEVEL=0
 
-
-serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser -g3
 vendor/picohttpparser/%:CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser
 
+# shared code
+serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser -g3
 SERVE_OBJS = serve/serve.o vendor/picohttpparser/picohttpparser.o serve/req.o serve/res.o
+
+js/%: CFLAGS=-I. -std=gnu23 -Ivendor/quickjs -g3
+
+kv/%: CFLAGS=-I -std=gnu23 -Ivendor/sqlite/include  -g3
 
 LOG_OBJS = log/log.o
 
+JS_OBJS=js/js.o
+$(JS_OBJS): js/js.h js/js_internal.h
+
 ALLOCATOR_OBJS = allocator/allocator.o
+
 STR_OBJS = str/str.o
 $(STR_OBJS): str/str.h
 
@@ -51,8 +59,8 @@ $(LOOPY_OBJS): loopy/internal.h
 
 loopy: bin/loopy
              
-bin/loopy: $(UV_A) $(LOG_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOOPY_OBJS)  $(STR_OBJS)
-	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOG_OBJS) $(STR_OBJS) $(UV_A) -o $@
+bin/loopy: $(QUICKJS_A) $(UV_A) $(LOG_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOOPY_OBJS)  $(STR_OBJS) $(JS_OBJS)
+	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOG_OBJS) $(STR_OBJS) $(JS_OBJS) $(UV_A) $(QUICKJS_A) -lm -o $@
 
 
 LOOPY_TEST_OBJS = loopy/test.o

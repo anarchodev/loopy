@@ -1,14 +1,35 @@
 #include <allocator/allocator.h>
-#include <serve/serve.h>
 #include <log/log.h>
+#include <serve/serve.h>
 
 #include "internal.h"
+#include "js/js.h"
+#include "str/str.h"
+
+void eval_cb(js_i self, str_dynamic_t*result, int status)  {
+    srv_response_i res;
+
+    (void)(status);
+
+    res = js_get_opaque(self) ;
+
+    srv_response_body_append(res, result->slice);
+    str_dynamic_delete(result);
+    js_delete(self);
+}
 
 void loopy_on_request(srv_request_i request, srv_response_i response) {
-    (void)(request);
-    log_info("loopy_on_request called");
-    srv_response_status_set(response, 200);
-    srv_response_body_append(response, to_slice("OK"));
+  js_i js;
+  (void)(request);
+  log_info("loopy_on_request called");
+
+  srv_response_status_set(response, 200);
+
+  js = js_new(allocator_default());
+
+  js_set_opaque(js, response);
+
+  js_eval(js, to_slice("\"OK\";"), eval_cb); 
 }
 
 int main(int argc, char **argv) {

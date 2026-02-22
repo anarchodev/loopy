@@ -30,7 +30,7 @@ typedef struct str_dynamic_s {
 str_slice_t str_cstring_to_slice(const char *cstring, unsigned long len);
 
 int str_dynamic_new(allocator_t t, str_dynamic_t *self, str_slice_t str);
-void str_dyanmic_delete(str_dynamic_t *self);
+void str_dynamic_delete(str_dynamic_t *self);
 int str_dynamic_append(str_dynamic_t *self, str_slice_t str);
 int str_dynamic_append_long(str_dynamic_t *self, long num);
 void str_dynamic_to_cstring(str_dynamic_t *self, char *out);

@@ -27,7 +27,7 @@ int str_dynamic_new(allocator_t allocator, str_dynamic_t *self,
     self->slice.len = str.len;
     memcpy(self->storage.buffer, str.ptr, str.len);
   } else {
-    self->storage.capacity = new_capacity(self->slice.len);
+    self->storage.capacity = new_capacity(str.len);
 
     self->slice.ptr = allocator.malloc(self->storage.capacity);
     self->slice.len = str.len;
@@ -36,7 +36,7 @@ int str_dynamic_new(allocator_t allocator, str_dynamic_t *self,
   return 0;
 }
 
-void str_dyanmic_delete(str_dynamic_t *self) {
+void str_dynamic_delete(str_dynamic_t *self) {
   if (self->slice.len > sizeof self->storage.buffer) {
     self->allocator.free(self->slice.ptr);
   }
