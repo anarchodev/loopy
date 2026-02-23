@@ -4,6 +4,7 @@
 
 #include "internal.h"
 #include "js/js.h"
+#include "kv/kv.h"
 #include "str/str.h"
 
 void eval_cb(js_i self, str_dynamic_t*result, int status)  {
@@ -20,16 +21,19 @@ void eval_cb(js_i self, str_dynamic_t*result, int status)  {
 
 void loopy_on_request(srv_request_i request, srv_response_i response) {
   js_i js;
+  kv_i kv;
   (void)(request);
   log_info("loopy_on_request called");
 
   srv_response_status_set(response, 200);
 
-  js = js_new(allocator_default());
+  kv = kv_new(allocator_default());
+
+  js = js_new(allocator_default(), kv);
 
   js_set_opaque(js, response);
 
-  js_eval(js, to_slice("\"OK\";"), eval_cb); 
+  js_eval(js, to_slice("/index.js"), to_slice("\"mike\""), eval_cb); 
 }
 
 int main(int argc, char **argv) {

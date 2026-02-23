@@ -34,6 +34,8 @@ void str_dynamic_delete(str_dynamic_t *self);
 int str_dynamic_append(str_dynamic_t *self, str_slice_t str);
 int str_dynamic_append_long(str_dynamic_t *self, long num);
 void str_dynamic_to_cstring(str_dynamic_t *self, char *out);
+void str_dynamic_set(str_dynamic_t*self, str_slice_t val);
+void str_dynamic_reset(str_dynamic_t *self);
 
 void str_fixed_init(str_fixed_t *self, str_slice_t str, unsigned long capacity);
 int str_fixed_append(str_fixed_t *self, str_slice_t slice);

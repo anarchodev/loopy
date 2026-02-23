@@ -3,14 +3,26 @@
 #include "js/js_internal.h"
 #include "quickjs.h"
 #include "str/str.h"
+#include <assert.h>
 
-js_i js_new(allocator_t allocator) {
+JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
+                              void *opaque) {
+  (void)(opaque);
+  (void)(ctx);
+  (void)(module_name);
+  assert(false);
+}
+
+js_i js_new(allocator_t allocator, kv_i kv) {
   js_i self;
   self = allocator.malloc(sizeof *self);
   self->allocator = allocator;
   self->runtime = JS_NewRuntime();
   self->context = JS_NewContext(self->runtime);
   JS_SetContextOpaque(self->context, self);
+  self->kv = kv;
+
+  JS_SetModuleLoaderFunc(self->runtime, NULL, kv_module_loader, self);
   return self;
 }
 
@@ -20,27 +32,26 @@ void js_delete(js_i self) {
   self->allocator.free(self);
 }
 
-void js_set_opaque(js_i self, void*data){
-    self->opaque  = data;
-}
+void js_set_opaque(js_i self, void *data) { self->opaque = data; }
 
-void *js_get_opaque(js_i self){
-    return self->opaque;
-}
+void *js_get_opaque(js_i self) { return self->opaque; }
 
-void js_eval(js_i self, str_slice_t code, js_eval_cb cb) {
+void js_eval(js_i self, str_slice_t func_path, str_slice_t args,
+             js_eval_cb cb) {
   JSValue result;
   JSValue jsjson;
-  char *tmp;
+
+  const char code[] = "export function hello_world(name) {\n"
+  "  return `hello ${}`;\n"
+  "}\n";
   const char *json;
   str_dynamic_t err;
   str_dynamic_t djson;
-  tmp = self->allocator.malloc(code.len + 1);
-  memcpy(tmp, code.ptr, code.len);
-  tmp[code.len] = 0;
 
-  result = JS_Eval(self->context, tmp, code.len, "main", JS_EVAL_TYPE_GLOBAL);
-  self->allocator.free(tmp);
+  (void)(func_path);
+  (void)(args);
+
+  result = JS_Eval(self->context, code, sizeof code, "index.js", JS_EVAL_TYPE_MODULE);
 
   if (JS_IsException(result)) {
     JSValue exception = JS_GetException(self->context);

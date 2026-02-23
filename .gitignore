@@ -3,3 +3,4 @@
 /bin
 *.o
 /.gdb_history
+/db.db

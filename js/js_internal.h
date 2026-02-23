@@ -3,12 +3,13 @@
 
 #include "allocator/allocator.h"
 #include "js.h"
-#include "quickjs.h"
+#include <quickjs.h>
 
 struct js_s {
     JSRuntime*runtime;
     JSContext*context;
     allocator_t allocator;
+    kv_i kv;
     void*opaque;
 };
 

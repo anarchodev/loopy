@@ -59,7 +59,7 @@ int str_dynamic_append(str_dynamic_t *self, str_slice_t str) {
   }
 
   while (str.len > self->storage.capacity - self->slice.len) {
-    self->storage.capacity = new_capacity(self->slice.len);
+    self->storage.capacity = new_capacity(self->storage.capacity);
   }
 
   self->slice.ptr =

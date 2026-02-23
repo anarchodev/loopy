@@ -36,16 +36,22 @@ vendor/picohttpparser/%:CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/pi
 
 # shared code
 serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser -g3
-SERVE_OBJS = serve/serve.o vendor/picohttpparser/picohttpparser.o serve/req.o serve/res.o
+SERVE_OBJS = serve/serve.o \
+             vendor/picohttpparser/picohttpparser.o \
+             serve/req.o \
+             serve/res.o
+
+$(SERVE_OBJS): $(UV_A) serve/serve.h serve/serve_internal.h
 
 js/%: CFLAGS=-I. -std=gnu23 -Ivendor/quickjs -g3
 
-kv/%: CFLAGS=-I -std=gnu23 -Ivendor/sqlite/include  -g3
+kv/%: CFLAGS=-I. -std=gnu23 -Ivendor/sqlite -g3
+KV_OBJS =
 
 LOG_OBJS = log/log.o
 
 JS_OBJS=js/js.o
-$(JS_OBJS): js/js.h js/js_internal.h
+$(JS_OBJS): $(QUICKJS_A) js/js.h js/js_internal.h
 
 ALLOCATOR_OBJS = allocator/allocator.o
 
@@ -53,7 +59,7 @@ STR_OBJS = str/str.o
 $(STR_OBJS): str/str.h
 
 ## programs
-LOOPY_OBJS = loopy/main.o loopy/args.o
+LOOPY_OBJS = loopy/main.o loopy/args.o $(KV_OBJS)
 
 $(LOOPY_OBJS): loopy/internal.h
 
@@ -80,7 +86,12 @@ $(STR_TEST_OBJS): str/str.h
 bin/str-test: $(STR_TEST_OBJS) $(ALLOCATOR_OBJS)
 	$(CC) $(CFLAGS) $(STR_TEST_OBJS) $(ALLOCATOR_OBJS) -o $@
 
-test: loopy-test str-test
-	./bin/str-test
-	./bin/loopy-test
+test: loopy-test str-test kv-test
 
+KV_TEST_OBJS = kv/test.o kv/kv.o
+$(STR_TEST_OBJS): kv/kv.h kv/kv_internal.h
+
+kv-test: ./bin/kv-test
+
+bin/kv-test: $(SQLITE_A) $(KV_TEST_OBJS) $(ALLOCATOR_OBJS) $(STR_OBJS)
+	$(CC) $(CFLAGS) $(KV_TEST_OBJS) $(ALLOCATOR_OBJS) $(STR_OBJS) $(SQLITE_A) -lm -o $@
