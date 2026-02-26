@@ -14,7 +14,8 @@ clean:
 ## vendor
 UV_A = vendor/libuv/build/libuv.a
 PQ_A = vendor/postgres/src/interfaces/libpq/libpq.a
-QUICKJS_A = vendor/quickjs/libquickjs.a
+QUICKJS_A = vendor/quickjs/build/libqjs.a
+QUICKJS_LIBC_A = vendor/quickjs/build/libqjs-libc.a
 SQLITE_A = vendor/sqlite/libsqlite3.a
 
 vendor/sqlite/configure:
@@ -24,7 +25,7 @@ $(UV_A):
 	cd vendor/libuv; cmake -B build; cmake --build build
 
 $(QUICKJS_A):
-	cd vendor/quickjs/; make MAKELEVEL=0
+	cd vendor/quickjs/; cmake -B build; cmake --build build
 
 $(SQLITE_A): vendor/sqlite/configure
 	cd vendor/sqlite/; ./configure; make MAKELEVEL=0
@@ -46,7 +47,7 @@ $(SERVE_OBJS): $(UV_A) serve/serve.h serve/serve_internal.h
 js/%: CFLAGS=-I. -std=gnu23 -Ivendor/quickjs -g3
 
 kv/%: CFLAGS=-I. -std=gnu23 -Ivendor/sqlite -g3
-KV_OBJS =
+KV_OBJS = kv/kv.o
 
 LOG_OBJS = log/log.o
 
@@ -59,14 +60,14 @@ STR_OBJS = str/str.o
 $(STR_OBJS): str/str.h
 
 ## programs
-LOOPY_OBJS = loopy/main.o loopy/args.o $(KV_OBJS)
+LOOPY_OBJS = loopy/main.o loopy/args.o 
 
 $(LOOPY_OBJS): loopy/internal.h
 
 loopy: bin/loopy
              
-bin/loopy: $(QUICKJS_A) $(UV_A) $(LOG_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOOPY_OBJS)  $(STR_OBJS) $(JS_OBJS)
-	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOG_OBJS) $(STR_OBJS) $(JS_OBJS) $(UV_A) $(QUICKJS_A) -lm -o $@
+bin/loopy: $(SQLITE_A) $(QUICKJS_A) $(UV_A) $(LOG_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(LOOPY_OBJS) $(KV_OBJS) $(STR_OBJS) $(JS_OBJS)
+	$(CC) $(CFLAGS) $(LOOPY_OBJS) $(SERVE_OBJS) $(ALLOCATOR_OBJS) $(QUICKJS_LIBC_A) $(LOG_OBJS) $(STR_OBJS) $(JS_OBJS) $(KV_OBJS)  $(UV_A) $(QUICKJS_A) $(SQLITE_A) -lm -o $@
 
 
 LOOPY_TEST_OBJS = loopy/test.o

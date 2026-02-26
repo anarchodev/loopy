@@ -29,11 +29,15 @@ void loopy_on_request(srv_request_i request, srv_response_i response) {
 
   kv = kv_new(allocator_default());
 
+  kv_set(kv, to_slice("index.js"), to_slice("export function hello_world(name) {\n"
+  "  return `hello ${name}`;\n"
+  "}\n"));
+
   js = js_new(allocator_default(), kv);
 
   js_set_opaque(js, response);
 
-  js_eval(js, to_slice("/index.js"), to_slice("\"mike\""), eval_cb); 
+  js_eval(js, to_slice("/index.js"), to_slice("\"mike\""), request, response); 
 }
 
 int main(int argc, char **argv) {

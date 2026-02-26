@@ -23,7 +23,7 @@ typedef struct str_dynamic_s {
   } storage;
 } str_dynamic_t;
 
-#define to_slice(s) str_cstring_to_slice(s, (sizeof s)-1)
+#define to_slice(s) str_cstring_to_slice((s), (sizeof (s))-1)
 
 #define MAX_DYNAMIC_BUFFER (1024 * 1024 * 1024)
 
