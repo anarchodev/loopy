@@ -1,5 +1,6 @@
 #include "js.h"
 #include "allocator/allocator.h"
+#include "cls/cls.h"
 #include "js/js_internal.h"
 #include "kv/kv.h"
 #include "quickjs.h"
@@ -11,18 +12,18 @@ JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
                               void *opaque) {
   JSValue result;
   char *code_cstring;
-  str_dynamic_t err;
+  str_t err;
   JSModuleDef *m;
   js_i js = opaque;
 
-  str_dynamic_t code;
-  str_dynamic_new(js->allocator, &code, to_slice(""));
+  str_t code;
+  str_init(cls_allocator(js), &code, to_slice(""));
 
   kv_get(js->kv, str_cstring_to_slice(module_name, strlen(module_name)), &code);
 
-  code_cstring = js->allocator.malloc(code.slice.len + 1);
+  code_cstring = cls_malloc(js, code.slice.len + 1);
 
-  str_dynamic_to_cstring(&code, code_cstring);
+  str_to_cstring(&code, code_cstring);
 
   result = JS_Eval(js->context, code_cstring, code.slice.len, module_name,
                    JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
@@ -31,7 +32,7 @@ JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
     JSValue exception = JS_GetException(ctx);
     const char *error = JS_ToCString(ctx, exception);
     fprintf(stderr, "JavaScript exception: %s\n", error);
-    str_dynamic_new(js->allocator, &err,
+    str_init(js->allocator, &err,
                     str_cstring_to_slice(error, strlen(error)));
 
     JS_FreeCString(ctx, error);
@@ -80,8 +81,8 @@ void js_eval(js_i self, str_slice_t func_path, str_slice_t args,
   const char code[] = "import { hello_world } from './index.js'\n"
                       "export const blah = hello_world('test');\n";
   const char *json;
-  str_dynamic_t err;
-  str_dynamic_t djson;
+  str_t err;
+  str_t djson;
 
   (void)(func_path);
   (void)(args);
@@ -93,7 +94,7 @@ void js_eval(js_i self, str_slice_t func_path, str_slice_t args,
     JSValue exception = JS_GetException(self->context);
     const char *error = JS_ToCString(self->context, exception);
     fprintf(stderr, "JavaScript exception: %s\n", error);
-    str_dynamic_new(self->allocator, &err,
+    str_init(self->allocator, &err,
                     str_cstring_to_slice(error, strlen(error)));
     JS_FreeCString(self->context, error);
     JS_FreeValue(self->context, exception);
@@ -117,7 +118,7 @@ void js_eval(js_i self, str_slice_t func_path, str_slice_t args,
 
   json = JS_ToCString(self->context, jsjson);
 
-  str_dynamic_new(self->allocator, &djson,
+  str_init(self->allocator, &djson,
                   str_cstring_to_slice(json, strlen(json)));
   JS_FreeCString(self->context, json);
   JS_FreeValue(self->context, jsjson);

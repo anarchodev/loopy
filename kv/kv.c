@@ -5,8 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-kv_i kv_new(allocator_t allocator) {
-  kv_t *self;
+int kv_init(allocator_t allocator, kv_i self) {
   const char *sql =
       "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT)";
   char *err_msg = 0;
@@ -30,14 +29,14 @@ kv_i kv_new(allocator_t allocator) {
     goto fail;
   }
 
-  return self;
+  return 0;
 
 fail:
-  kv_delete(self);
-  return NULL;
+  kv_deinit(self);
+  return -1;
 }
 
-void kv_delete(kv_i self) {
+void kv_deinit(kv_i self) {
   sqlite3_close(self->db);
   self->allocator.free(self);
 }
@@ -46,32 +45,36 @@ int callback(void *result, int argc, char **argv, char **azColName) {
   (void)(azColName);
   (void)(argc);
 
-  str_dynamic_t *res = result;
+  kv_result_t*res = result;
 
-  str_dynamic_append(res, str_cstring_to_slice(argv[0], strlen(argv[0])));
+  str_append(res->allocator, res->result, str_cstring_to_slice(argv[0], strlen(argv[0])));
 
   return 0;
 }
 
-int kv_get(kv_i self, str_slice_t key, str_dynamic_t *result) {
+int kv_get(kv_i self, str_slice_t key, str_t *result) {
   int rc;
   char *err_msg;
   char *query_cstring;
-  str_dynamic_t query;
-  str_dynamic_new(self->allocator, &query,
-                  to_slice("SELECT value FROM kv WHERE key = \""));
-  str_dynamic_append(&query, key);
-  str_dynamic_append(&query, to_slice("\";"));
+  str_t query;
+  kv_result_t container;
+  str_init(self->allocator, &query,
+           to_slice("SELECT value FROM kv WHERE key = \""));
+  str_append(self->allocator, &query, key);
+  str_append(self->allocator, &query, to_slice("\";"));
 
   query_cstring = self->allocator.malloc(query.slice.len + 1);
 
-  str_dynamic_to_cstring(&query, query_cstring);
+  str_to_cstring(&query, query_cstring);
 
-  rc = sqlite3_exec(self->db, query_cstring, callback, result, &err_msg);
+  container.allocator=self->allocator;
+  container.result = result;
+
+  rc = sqlite3_exec(self->db, query_cstring, callback, &container, &err_msg);
 
   self->allocator.free(query_cstring);
 
-  str_dynamic_delete(&query);
+  str_deinit(self->allocator, &query);
   return rc;
 }
 
@@ -79,24 +82,24 @@ int kv_set(kv_i self, str_slice_t key, str_slice_t val) {
   int rc;
   char *err_msg;
   char *query_cstring;
-  str_dynamic_t query;
-  str_dynamic_new(self->allocator, &query,
-                  to_slice("INSERT INTO kv(key, value) VALUES (\""));
-  str_dynamic_append(&query, key);
-  str_dynamic_append(&query, to_slice("\", \""));
-  str_dynamic_append(&query, val);
-  str_dynamic_append(
-      &query,
+  str_t query;
+  str_init(self->allocator, &query,
+           to_slice("INSERT INTO kv(key, value) VALUES (\""));
+  str_append(self->allocator, &query, key);
+  str_append(self->allocator, &query, to_slice("\", \""));
+  str_append(self->allocator, &query, val);
+  str_append(
+      self->allocator, &query,
       to_slice("\") ON CONFLICT (key) DO UPDATE SET value=excluded.value;"));
 
   query_cstring = self->allocator.malloc(query.slice.len + 1);
 
-  str_dynamic_to_cstring(&query, query_cstring);
+  str_to_cstring(&query, query_cstring);
 
   rc = sqlite3_exec(self->db, query_cstring, callback, NULL, &err_msg);
 
   self->allocator.free(query_cstring);
 
-  str_dynamic_delete(&query);
+  str_deinit(self->allocator, &query);
   return rc;
 }

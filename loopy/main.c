@@ -7,7 +7,7 @@
 #include "kv/kv.h"
 #include "str/str.h"
 
-void eval_cb(js_i self, str_dynamic_t*result, int status)  {
+void eval_cb(js_i self, str_t*result, int status)  {
     srv_response_i res;
 
     (void)(status);
@@ -15,7 +15,7 @@ void eval_cb(js_i self, str_dynamic_t*result, int status)  {
     res = js_get_opaque(self) ;
 
     srv_response_body_append(res, result->slice);
-    str_dynamic_delete(result);
+    cls_deinit(result);
     js_delete(self);
 }
 
