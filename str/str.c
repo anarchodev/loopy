@@ -105,3 +105,10 @@ str_slice_t str_cstring_to_slice(const char *const cstring, unsigned long len) {
   return tmp;
 }
 
+str_slice_t str_slice(char *ptr, unsigned long len) {
+  str_slice_t tmp;
+  tmp.ptr = ptr;
+  tmp.len = len;
+  return tmp;
+}
+

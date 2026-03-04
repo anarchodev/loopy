@@ -20,11 +20,14 @@ typedef struct srv_request_s {
   allocator_t allocator;
   struct phr_header headers[100];
   size_t headers_count;
-  char buffer[4096];
-  str_slice_t current_buffer;
-  str_slice_t buffer_previous;
+  char raw_buffer[4096];
+  str_fixed_t buffer;
+  size_t buffer_previous_len;
   str_slice_t path;
   str_slice_t method;
+  str_slice_t body;
+  size_t expected_body_len;
+  int headers_parsed;
   int minor_version;
   srv_request_cb request_cb;
 } srv_request_t;
@@ -40,11 +43,6 @@ typedef struct srv_response_s {
   str_fixed_t body;
 }srv_response_t;
 
-srv_request_t *srv_request_new(allocator_t allocator, srv_request_cb cb);
-void srv_request_delete(srv_request_t *);
-
-srv_response_t *srv_response_new(allocator_t allocator);
-void srv_response_delete(srv_response_t *);
 
 void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf);
 void srv_write_cb(uv_write_t *, int);

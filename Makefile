@@ -95,10 +95,12 @@ $(STR_TEST_OBJS): str/str.h
 bin/str-test: $(STR_TEST_OBJS) $(STR_OBJS) $(ALLOCATOR_OBJS)
 	$(CC) $(LDFLAGS) $^ -o $@
 
-test: loopy-test str-test kv-test
+test: loopy-test str-test kv-test js-test serve-test
 	./bin/loopy-test
 	./bin/str-test
 	./bin/kv-test
+	./bin/js-test
+	./bin/serve-test
 
 coverage: test
 	./bin/str-test
@@ -106,7 +108,26 @@ coverage: test
 	genhtml coverage.info --output-directory coverage_html
 	@echo "open coverage_html/index.html"
 
-KV_TEST_OBJS = kv/test.o 
+SERVE_TEST_OBJS = serve/test.o
+$(SERVE_TEST_OBJS): serve/serve.h serve/serve_internal.h
+
+serve-test: bin/serve-test
+
+bin/serve-test: $(SERVE_TEST_OBJS) serve/req.o serve/res.o \
+	        vendor/picohttpparser/picohttpparser.o \
+	        $(STR_OBJS) $(ALLOCATOR_OBJS)
+	$(CC) $(LDFLAGS) $^ -o $@
+
+JS_TEST_OBJS = js/test.o
+$(JS_TEST_OBJS): js/js.h js/js_internal.h
+
+js-test: bin/js-test
+
+bin/js-test: $(JS_TEST_OBJS) $(JS_OBJS) $(KV_OBJS) $(SQLITE_A) $(STR_OBJS) \
+	     $(ALLOCATOR_OBJS) $(QUICKJS_A) serve/req.o serve/res.o
+	$(CC) $(LDFLAGS) $^ -lm -o $@
+
+KV_TEST_OBJS = kv/test.o
 $(KV_TEST_OBJS): kv/kv.h kv/kv_internal.h
 
 kv-test: ./bin/kv-test

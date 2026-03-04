@@ -29,6 +29,7 @@ typedef struct {
 #define MAX_DYNAMIC_BUFFER (1024 * 1024)
 
 str_slice_t str_cstring_to_slice(const char *const cstring, unsigned long len);
+str_slice_t str_slice(char *ptr, unsigned long len);
 int str_slice_eq(str_slice_t a, str_slice_t b);
 
 int str_init(allocator_t t, str_t *const self, str_slice_t str);
@@ -42,5 +43,7 @@ void str_reset(str_t *const self);
 str_fixed_t str_fixed_init(str_slice_t str, unsigned long capacity);
 int str_fixed_append(str_fixed_t *const self, str_slice_t slice);
 int str_fixed_append_long(str_fixed_t *const self, long data);
+str_slice_t str_fixed_get_slice(str_fixed_t const*const self);
+unsigned long str_fixed_len(str_fixed_t const*const self);
 
 #endif

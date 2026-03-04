@@ -3,7 +3,9 @@
 #include <log/log.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <uv.h>
 
 #include "serve.h"
@@ -12,6 +14,8 @@
 
 srv_i srv_new(allocator_t allocator, srv_options_t options) {
   srv_t *srv = allocator.malloc(sizeof(*srv));
+  if (srv == NULL)
+    return NULL;
 
   srv->allocator = allocator;
   srv->request_cb = options.request_cb;
@@ -39,49 +43,76 @@ void alloc_buf(uv_handle_t *stream, size_t suggested_size, uv_buf_t *buf) {
   srv_request_t *request = stream->data;
   allocator_t alloc = request->allocator;
   buf->base = alloc.malloc(suggested_size);
-  buf->len = suggested_size;
+  buf->len = buf->base != NULL ? suggested_size : 0;
 }
 
 void srv_write_cb(uv_write_t *req, int) {
   srv_response_t *res = req->data;
-  res->allocator.free(res);
-  res->allocator.free(req);
+  allocator_t alloc = res->allocator;
+  alloc.free(res);
+  alloc.free(req);
+}
+
+static size_t find_content_length(struct phr_header *headers, size_t count) {
+  size_t i;
+  for (i = 0; i < count; i++) {
+    if (strncasecmp(headers[i].name, "content-length", headers[i].name_len) == 0)
+      return (size_t)strtoul(headers[i].value, NULL, 10);
+  }
+  return 0;
 }
 
 int srv_request_parse(srv_request_t *self) {
-  return phr_parse_request(self->buffer, self->current_buffer.len,
-                           (const char **)&self->method.ptr, &self->method.len,
-                           (const char **)&self->path.ptr, &self->path.len,
-                           &self->minor_version, self->headers,
-                           &self->headers_count, self->buffer_previous.len);
+  size_t num_headers = sizeof(self->headers) / sizeof(self->headers[0]);
+  int ret = phr_parse_request(self->raw_buffer, str_fixed_len(&self->buffer),
+                              (const char **)&self->method.ptr, &self->method.len,
+                              (const char **)&self->path.ptr, &self->path.len,
+                              &self->minor_version, self->headers,
+                              &num_headers, self->buffer_previous_len);
+  if (ret > 0)
+    self->headers_count = num_headers;
+  return ret;
 }
+
 void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
   log_info("asdf");
   srv_request_t *request = stream->data;
   allocator_t alloc = request->allocator;
   if (nread < 0)
     goto done;
-  if (nread == UV_EOF)
-    goto done;
 
-  if (nread + request->current_buffer.len > (long)sizeof(request->buffer)) {
-    // to big
-    goto done;
+  request->buffer_previous_len = str_fixed_len(&request->buffer);
+  if (str_fixed_append(&request->buffer, str_slice(buf->base, nread)) < 0) {
+      goto done;
   }
 
-  memcpy(request->buffer + request->current_buffer.len, buf->base, nread);
-  request->buffer_previous.len = request->current_buffer.len;
-  request->current_buffer.len = request->current_buffer.len + nread;
+  if (!request->headers_parsed) {
+    int ret = srv_request_parse(request);
+    if (ret <= 0) {
+      free_buf(alloc, buf);
+      return;
+    }
+    request->headers_parsed = 1;
+    request->body.ptr = request->raw_buffer + ret;
+    request->expected_body_len =
+        find_content_length(request->headers, request->headers_count);
+  }
 
-  int ret = srv_request_parse(request);
-  if (ret > 0) {
-    // done
+  request->body.len =
+      str_fixed_len(&request->buffer) - (size_t)(request->body.ptr - request->raw_buffer);
+
+  if (request->body.len >= request->expected_body_len) {
+    request->body.len = request->expected_body_len;
     srv_response_t *response = srv_response_new(alloc);
 
     if (request->request_cb) {
       request->request_cb(request, response);
 
       uv_write_t *write = alloc.malloc(sizeof(*write));
+      if (write == NULL) {
+        srv_response_delete(response);
+        goto done;
+      }
       write->data = response;
 
       uv_buf_t bufs[3];
@@ -100,7 +131,10 @@ void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
       bufs[2] = uv_buf_init(response->body.s.ptr, response->body.s.len);
 
       uv_write(write, stream, bufs, 3, srv_write_cb);
+    } else {
+      srv_response_delete(response);
     }
+    srv_request_reset(request);
   }
 
   free_buf(alloc, buf);
@@ -120,9 +154,13 @@ void srv_connection_cb(uv_stream_t *stream, int status) {
   srv_t *srv = stream->data;
   allocator_t alloc = srv->allocator;
   srv_request_t *request = srv_request_new(alloc, srv->request_cb);
-  request->headers_count =
-      sizeof(request->headers) / sizeof(request->headers[0]);
+  if (request == NULL)
+    return;
   uv_tcp_t *client = alloc.malloc(sizeof(*client));
+  if (client == NULL) {
+    srv_request_delete(request);
+    return;
+  }
   client->data = request;
   uv_tcp_init(srv->loop, client);
   if ((status = uv_accept(stream, (uv_stream_t *)client)) < 0)
@@ -136,6 +174,7 @@ void srv_connection_cb(uv_stream_t *stream, int status) {
   return;
 
 fail:
+  srv_request_delete(request);
   alloc.free(client);
 }
 
@@ -163,7 +202,8 @@ int srv_run(srv_i srv) {
 
   ret = uv_loop_init(&loop);
   if (ret < 0) {
-    goto done;
+    uv_library_shutdown();
+    return ret;
   }
 
   ret = uv_tcp_init(&loop, &srv->listen_socket);

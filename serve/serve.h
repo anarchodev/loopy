@@ -24,8 +24,19 @@ int srv_run(srv_i);
 
 srv_options_t srv_default();
 
+srv_request_i srv_request_new(allocator_t allocator, srv_request_cb cb);
+void srv_request_delete(srv_request_i);
+int srv_request_parse(srv_request_i self);
+
+srv_response_i srv_response_new(allocator_t allocator);
+void srv_response_delete(srv_response_i);
 void srv_response_status_set(srv_response_i, int status);
 int srv_response_body_append(srv_response_i, str_slice_t body);
 int srv_response_headers_append(srv_response_i, str_slice_t header);
+
+str_slice_t srv_request_get_method(srv_request_i);
+str_slice_t srv_request_get_body(srv_request_i);
+str_slice_t srv_request_get_buffer(srv_request_i);
+void srv_request_reset(srv_request_i self);
 
 #endif

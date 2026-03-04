@@ -28,3 +28,7 @@ int str_fixed_append_long(str_fixed_t *self, long num) {
   assert(n >= 0);
   return str_fixed_append(self, str_cstring_to_slice(tmp, n));
 }
+
+str_slice_t str_fixed_get_slice(str_fixed_t const*const self) { return self->s; }
+
+unsigned long str_fixed_len(str_fixed_t const*const self) { return self->s.len; }
