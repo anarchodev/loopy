@@ -6,6 +6,19 @@
 
 static allocator_t allocator;
 
+/* --- failing test allocator --- */
+
+static void *fail_malloc(size_t n) { (void)n; return NULL; }
+static void *fail_realloc(void *p, size_t n) { (void)p; (void)n; return NULL; }
+
+static allocator_t failing_allocator(void) {
+  allocator_t a;
+  a.malloc = fail_malloc;
+  a.realloc = fail_realloc;
+  a.free = free;
+  return a;
+}
+
 /* --- str_slice tests --- */
 
 static void test_slice_eq_equal(void) {
@@ -258,6 +271,40 @@ static void test_fixed_append_long_overflow(void) {
   assert(f.s.len == 0);
 }
 
+/* --- OOM tests --- */
+
+static void test_str_init_oom(void) {
+  allocator_t fail = failing_allocator();
+  str_t s;
+  /* 17 bytes requires heap; malloc fails → init must return -1 */
+  assert(str_init(fail, &s, str_cstring_to_slice("12345678901234567", 17)) == -1);
+}
+
+static void test_str_append_oom_sso_to_heap(void) {
+  allocator_t fail = failing_allocator();
+  str_t s;
+  /* init inline (5 bytes), then append enough to cross the SSO boundary */
+  assert(str_init(allocator, &s, str_cstring_to_slice("hello", 5)) == 0);
+  assert(str_append(fail, &s, str_cstring_to_slice("123456789012", 12)) == -1);
+  /* ptr, len, and data all intact */
+  assert(s.slice.ptr == s.storage.buffer);
+  assert(s.slice.len == 5);
+  assert(memcmp(s.slice.ptr, "hello", 5) == 0);
+  str_deinit(allocator, &s);
+}
+
+static void test_str_append_oom_heap_grow(void) {
+  allocator_t fail = failing_allocator();
+  str_t s;
+  /* init on heap (17 bytes), then try to grow with failing allocator */
+  assert(str_init(allocator, &s, str_cstring_to_slice("12345678901234567", 17)) == 0);
+  assert(str_append(fail, &s, str_cstring_to_slice("more", 4)) == -1);
+  /* original heap ptr is unchanged; data and len are intact */
+  assert(s.slice.len == 17);
+  assert(memcmp(s.slice.ptr, "12345678901234567", 17) == 0);
+  str_deinit(allocator, &s);
+}
+
 int main(void) {
   allocator = allocator_default();
 
@@ -289,6 +336,10 @@ int main(void) {
   test_fixed_append_overflow();
   test_fixed_append_long();
   test_fixed_append_long_overflow();
+
+  test_str_init_oom();
+  test_str_append_oom_sso_to_heap();
+  test_str_append_oom_heap_grow();
 
   return 0;
 }

@@ -7,20 +7,7 @@
 #include "kv/kv.h"
 #include "str/str.h"
 
-void eval_cb(js_i self, str_t*result, int status)  {
-    srv_response_i res;
-
-    (void)(status);
-
-    res = js_get_opaque(self) ;
-
-    srv_response_body_append(res, result->slice);
-    cls_deinit(result);
-    js_delete(self);
-}
-
 void loopy_on_request(srv_request_i request, srv_response_i response) {
-  js_i js;
   kv_i kv;
   (void)(request);
   log_info("loopy_on_request called");
@@ -33,11 +20,7 @@ void loopy_on_request(srv_request_i request, srv_response_i response) {
   "  return `hello ${name}`;\n"
   "}\n"));
 
-  js = js_new(allocator_default(), kv);
 
-  js_set_opaque(js, response);
-
-  js_eval(js, to_slice("/index.js"), to_slice("\"mike\""), request, response); 
 }
 
 int main(int argc, char **argv) {

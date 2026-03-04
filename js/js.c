@@ -1,6 +1,5 @@
 #include "js.h"
 #include "allocator/allocator.h"
-#include "cls/cls.h"
 #include "js/js_internal.h"
 #include "kv/kv.h"
 #include "quickjs.h"
@@ -17,11 +16,11 @@ JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
   js_i js = opaque;
 
   str_t code;
-  str_init(cls_allocator(js), &code, to_slice(""));
+  str_init(js->allocator, &code, to_slice(""));
 
   kv_get(js->kv, str_cstring_to_slice(module_name, strlen(module_name)), &code);
 
-  code_cstring = cls_malloc(js, code.slice.len + 1);
+  code_cstring = js->allocator.malloc(code.slice.len + 1);
 
   str_to_cstring(&code, code_cstring);
 
@@ -65,9 +64,6 @@ void js_delete(js_i self) {
   self->allocator.free(self);
 }
 
-void js_set_opaque(js_i self, void *data) { self->opaque = data; }
-
-void *js_get_opaque(js_i self) { return self->opaque; }
 
 void js_eval(js_i self, str_slice_t func_path, str_slice_t args,
              srv_request_i req, srv_response_i res) {

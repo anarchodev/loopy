@@ -1,15 +1,26 @@
-.PHONY: all clean loopy test
-	
-CFLAGS = -Wextra -pedantic -g3 \
-         -fsanitize=address,undefined -O0 -std=c89\
-         -Wall -D_GNU_SOURCE=1 -Werror -fanalyzer \
-         -fuse-ld=mold -I.
+.PHONY: all clean loopy test coverage
+
+BUILD ?= debug
+
+ifeq ($(BUILD),release)
+  CFLAGS_MODE  = -O2 -DNDEBUG
+  LDFLAGS_MODE =
+else
+  CFLAGS_MODE  = -g3 -fsanitize=address,undefined -O0 -fanalyzer --coverage -Werror
+  LDFLAGS_MODE = -fsanitize=address,undefined --coverage -lgcov
+endif
+
+CFLAGS  = -Wextra -pedantic -std=c89 -Wall -D_GNU_SOURCE=1  \
+          -I. $(CFLAGS_MODE)
+
+LDFLAGS = -fuse-ld=mold $(LDFLAGS_MODE)
 
 all: loopy
 
 clean:
-	find . -type f -name "*.o" -not -path "./vendor*" -exec rm {} \;
-	rm bin/*
+	find . -type f \( -name "*.o" -o -name "*.gcda" -o -name "*.gcno" \) \
+	       -not -path "./vendor*" -exec rm {} \;
+	rm -rf bin/* coverage.info coverage_html
 
 ## vendor
 UV_A = vendor/libuv/build/libuv.a
@@ -21,20 +32,20 @@ SQLITE_A = vendor/sqlite/libsqlite3.a
 vendor/sqlite/configure:
 	git submodule update --init --recursive
 
-$(UV_A): 
-	cd vendor/libuv; cmake -B build; cmake --build build
+$(UV_A):
+	cd vendor/libuv && cmake -B build && cmake --build build
 
 $(QUICKJS_A):
-	cd vendor/quickjs/; cmake -B build; cmake --build build
+	cd vendor/quickjs && cmake -B build && cmake --build build
 
 $(SQLITE_A): vendor/sqlite/configure
-	cd vendor/sqlite/; ./configure; make MAKELEVEL=0
+	cd vendor/sqlite && ./configure && $(MAKE) MAKELEVEL=0
 
 $(PQ_A):
-	cd vendor/postgres/; ./configure; cd src/interfaces/libpq/; make MAKELEVEL=0
+	cd vendor/postgres && ./configure && $(MAKE) -C src/interfaces/libpq MAKELEVEL=0
 
 vendor/picohttpparser/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include \
-                         -Ivendor/picohttpparser
+                         -Ivendor/picohttpparser $(CFLAGS_MODE)
 
 # utility code
 LOG_OBJS = log/log.o
@@ -45,18 +56,18 @@ STR_OBJS = str/str.o str/fixed.o
 $(STR_OBJS): str/str.h
 
 # wrapper code
-serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser -g3
+serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser $(CFLAGS_MODE)
 SERVE_OBJS = serve/serve.o \
              vendor/picohttpparser/picohttpparser.o \
              serve/req.o \
              serve/res.o
 $(SERVE_OBJS): $(UV_A) serve/serve.h serve/serve_internal.h
 
-kv/%: CFLAGS=-I. -std=gnu23 -Ivendor/sqlite -g3
+kv/%: CFLAGS=-I. -std=gnu23 -Ivendor/sqlite $(CFLAGS_MODE)
 KV_OBJS = kv/kv.o
 $(KV_OBJS): kv/kv.h
 
-js/%: CFLAGS=-I. -std=gnu23 -Ivendor/quickjs -g3
+js/%: CFLAGS=-I. -std=gnu23 -Ivendor/quickjs $(CFLAGS_MODE)
 JS_OBJS=js/js.o
 $(JS_OBJS): $(QUICKJS_A) js/js.h js/js_internal.h
 
@@ -66,24 +77,34 @@ $(LOOPY_OBJS): loopy/internal.h
 
 loopy: bin/loopy
              
-bin/loopy: $(LOOPY_OBJS) $(UV_A) $(QUICKJS_A) $(SQLITE_A)
-	$(CC) $(CFLAGS) $^  -lm -o $@
+bin/loopy: $(LOOPY_OBJS) $(KV_OBJS) $(ALLOCATOR_OBJS) $(STR_OBJS) \
+	   $(SERVE_OBJS) $(LOG_OBJS) $(UV_A) $(QUICKJS_A) $(SQLITE_A)
+	$(CC) $(LDFLAGS) $^ -lm -o $@
 
 LOOPY_TEST_OBJS = loopy/test.o
 
 loopy-test: bin/loopy-test
 
 bin/loopy-test: $(LOOPY_TEST_OBJS)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(LDFLAGS) $^ -o $@
 
 str-test: bin/str-test
 
 STR_TEST_OBJS = str/test.o
 $(STR_TEST_OBJS): str/str.h 
 bin/str-test: $(STR_TEST_OBJS) $(STR_OBJS) $(ALLOCATOR_OBJS)
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(LDFLAGS) $^ -o $@
 
 test: loopy-test str-test kv-test
+	./bin/loopy-test
+	./bin/str-test
+	./bin/kv-test
+
+coverage: test
+	./bin/str-test
+	lcov --capture --directory . --output-file coverage.info
+	genhtml coverage.info --output-directory coverage_html
+	@echo "open coverage_html/index.html"
 
 KV_TEST_OBJS = kv/test.o 
 $(KV_TEST_OBJS): kv/kv.h kv/kv_internal.h
@@ -92,4 +113,4 @@ kv-test: ./bin/kv-test
 
 bin/kv-test: $(KV_TEST_OBJS) $(KV_OBJS) $(SQLITE_A) $(STR_OBJS) \
 	     $(ALLOCATOR_OBJS)
-	$(CC) $(CFLAGS) $^ -lm -o $@
+	$(CC) $(LDFLAGS) $^ -lm -o $@

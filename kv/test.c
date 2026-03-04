@@ -1,8 +1,6 @@
 #include "allocator/allocator.h"
-#include "kv_internal.h"
 #include  "kv.h"
 #include "str/str.h"
-#include "log/log.h"
 #include <assert.h>
 
 int main() {
@@ -13,5 +11,7 @@ int main() {
     kv_set(kv, to_slice("foo"), to_slice("bar"));
 
     kv_get(kv, to_slice("foo"), &val);
+
+    kv_delete(kv);
     return 0;
 }

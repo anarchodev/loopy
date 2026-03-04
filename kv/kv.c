@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
-int kv_init(allocator_t allocator, kv_i self) {
+kv_i kv_new(allocator_t allocator) {
+    kv_i self;
   const char *sql =
       "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT)";
   char *err_msg = 0;
@@ -29,14 +30,14 @@ int kv_init(allocator_t allocator, kv_i self) {
     goto fail;
   }
 
-  return 0;
+  return self;
 
 fail:
-  kv_deinit(self);
-  return -1;
+  kv_delete(self);
+  return NULL;
 }
 
-void kv_deinit(kv_i self) {
+void kv_delete(kv_i self) {
   sqlite3_close(self->db);
   self->allocator.free(self);
 }

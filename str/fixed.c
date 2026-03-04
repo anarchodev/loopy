@@ -25,8 +25,6 @@ int str_fixed_append_long(str_fixed_t *self, long num) {
   char tmp[65];
   int n;
   n = snprintf(tmp, 65, "%ld", num);
-  if (n < 0) {
-    return -1;
-  }
+  assert(n >= 0);
   return str_fixed_append(self, str_cstring_to_slice(tmp, n));
 }

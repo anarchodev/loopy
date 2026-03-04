@@ -4,3 +4,4 @@
 *.o
 /.gdb_history
 /db.db
+*.gc[nd][ao]

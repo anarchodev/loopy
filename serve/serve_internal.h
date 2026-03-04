@@ -13,7 +13,7 @@ typedef struct srv_s {
   int port;
   int backlog;
   const char *host;
-  void (*request_cb)(srv_request_i, srv_response_i);
+  srv_request_cb request_cb;
 } srv_t;
 
 typedef struct srv_request_s {
@@ -26,7 +26,7 @@ typedef struct srv_request_s {
   str_slice_t path;
   str_slice_t method;
   int minor_version;
-  void (*request_cb)(srv_request_i, srv_response_i);
+  srv_request_cb request_cb;
 } srv_request_t;
 
 typedef struct srv_response_s {

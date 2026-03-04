@@ -1,5 +1,6 @@
 #include "str.h"
 #include "allocator/allocator.h"
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -55,10 +56,10 @@ int str_append(allocator_t allocator, str_t *const self, str_slice_t str) {
   }
   if (self->slice.len <= sizeof self->storage.buffer) {
     cap = new_capacity(self->slice.len + str.len);
-    self->slice.ptr = allocator.malloc(cap);
-    if (self->slice.ptr == NULL) {
-      return -1;
+    if ((tmp = allocator.malloc(cap)) == NULL) {
+        return -1;
     }
+    self->slice.ptr = tmp;
     memcpy(self->slice.ptr, self->storage.buffer, self->slice.len);
     self->storage.capacity = cap;
     goto append;
@@ -81,9 +82,7 @@ int str_append_long(allocator_t allocator, str_t *self, long num) {
   char tmp[65];
   int n;
   n = snprintf(tmp, 65, "%ld", num);
-  if (n < 0) {
-    return -1;
-  }
+  assert(n >= 0);
   return str_append(allocator, self, str_cstring_to_slice(tmp, n));
 }
 
