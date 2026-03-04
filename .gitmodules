@@ -13,6 +13,3 @@
 [submodule "vendor/libuv"]
 	path = vendor/libuv
 	url = git@github.com:libuv/libuv.git
-[submodule "vendor/CC"]
-	path = vendor/CC
-	url = git@github.com:JacksonAllan/CC.git

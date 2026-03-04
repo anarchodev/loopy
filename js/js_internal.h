@@ -4,11 +4,11 @@
 #include "kv/kv.h"
 #include <quickjs.h>
 
-struct js_s {
+typedef struct {
     allocator_t allocator;
     JSRuntime*runtime;
     JSContext*context;
     kv_i kv;
-};
+}js_t;
 
 #endif
