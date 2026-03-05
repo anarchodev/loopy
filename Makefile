@@ -24,6 +24,7 @@ clean:
 
 ## vendor
 UV_A = vendor/libuv/build/libuv.a
+URIPARSER_A = vendor/uriparser/build/liburiparser.a
 PQ_A = vendor/postgres/src/interfaces/libpq/libpq.a
 QUICKJS_A = vendor/quickjs/build/libqjs.a
 QUICKJS_LIBC_A = vendor/quickjs/build/libqjs-libc.a
@@ -37,6 +38,15 @@ $(UV_A):
 
 $(QUICKJS_A):
 	cd vendor/quickjs && cmake -B build && cmake --build build
+
+$(URIPARSER_A):
+	cd vendor/uriparser && cmake -B build \
+	  -DURIPARSER_SHARED_LIBS=OFF \
+	  -DURIPARSER_BUILD_DOCS=OFF \
+	  -DURIPARSER_BUILD_TESTS=OFF \
+	  -DURIPARSER_BUILD_TOOLS=OFF \
+	  -DURIPARSER_BUILD_WCHAR_T=OFF \
+	  && cmake --build build
 
 $(SQLITE_A): vendor/sqlite/configure
 	cd vendor/sqlite && ./configure && $(MAKE) MAKELEVEL=0
@@ -54,6 +64,9 @@ ALLOCATOR_OBJS = allocator/allocator.o
 
 STR_OBJS = str/str.o str/fixed.o
 $(STR_OBJS): str/str.h
+
+BASE64_OBJS = base64/base64.o
+$(BASE64_OBJS): base64/base64.h
 
 # wrapper code
 serve/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include -Ivendor/picohttpparser $(CFLAGS_MODE)
@@ -78,7 +91,7 @@ $(LOOPY_OBJS): loopy/internal.h
 loopy: bin/loopy
              
 bin/loopy: $(LOOPY_OBJS) $(KV_OBJS) $(ALLOCATOR_OBJS) $(STR_OBJS) \
-	   $(SERVE_OBJS) $(LOG_OBJS) $(UV_A) $(QUICKJS_A) $(SQLITE_A)
+	   $(BASE64_OBJS) $(SERVE_OBJS) $(LOG_OBJS) $(UV_A) $(QUICKJS_A) $(SQLITE_A) $(URIPARSER_A)
 	$(CC) $(LDFLAGS) $^ -lm -o $@
 
 LOOPY_TEST_OBJS = loopy/test.o
@@ -124,7 +137,7 @@ $(JS_TEST_OBJS): js/js.h js/js_internal.h
 js-test: bin/js-test
 
 bin/js-test: $(JS_TEST_OBJS) $(JS_OBJS) $(KV_OBJS) $(SQLITE_A) $(STR_OBJS) \
-	     $(ALLOCATOR_OBJS) $(QUICKJS_A) serve/req.o serve/res.o
+	     $(BASE64_OBJS) $(ALLOCATOR_OBJS) $(QUICKJS_A) serve/req.o serve/res.o
 	$(CC) $(LDFLAGS) $^ -lm -o $@
 
 KV_TEST_OBJS = kv/test.o
