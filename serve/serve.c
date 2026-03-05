@@ -53,10 +53,33 @@ void srv_write_cb(uv_write_t *req, int) {
   alloc.free(req);
 }
 
+static const char *reason_phrase(int status) {
+  switch (status) {
+    case 200: return "OK";
+    case 201: return "Created";
+    case 204: return "No Content";
+    case 301: return "Moved Permanently";
+    case 302: return "Found";
+    case 304: return "Not Modified";
+    case 400: return "Bad Request";
+    case 401: return "Unauthorized";
+    case 403: return "Forbidden";
+    case 404: return "Not Found";
+    case 405: return "Method Not Allowed";
+    case 409: return "Conflict";
+    case 500: return "Internal Server Error";
+    case 501: return "Not Implemented";
+    case 503: return "Service Unavailable";
+    default:  return "Unknown";
+  }
+}
+
 static size_t find_content_length(struct phr_header *headers, size_t count) {
   size_t i;
   for (i = 0; i < count; i++) {
     if (strncasecmp(headers[i].name, "content-length", headers[i].name_len) == 0)
+      /* safe: picohttpparser points value into the raw buffer where
+       * the character immediately after value_len is always '\r' */
       return (size_t)strtoul(headers[i].value, NULL, 10);
   }
   return 0;
@@ -75,7 +98,6 @@ int srv_request_parse(srv_request_t *self) {
 }
 
 void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
-  log_info("asdf");
   srv_request_t *request = stream->data;
   allocator_t alloc = request->allocator;
   if (nread < 0)
@@ -117,9 +139,13 @@ void srv_read_cb(uv_stream_t *stream, ssize_t nread, const uv_buf_t *buf) {
 
       uv_buf_t bufs[3];
 
+      const char *reason = reason_phrase(response->status);
       str_fixed_append(&response->status_line, to_slice("HTTP/1.1 "));
       str_fixed_append_long(&response->status_line, response->status);
-      str_fixed_append(&response->status_line, to_slice(" OK\r\n"));
+      str_fixed_append(&response->status_line, to_slice(" "));
+      str_fixed_append(&response->status_line,
+                       str_cstring_to_slice(reason, strlen(reason)));
+      str_fixed_append(&response->status_line, to_slice("\r\n"));
 
       str_fixed_append(&response->headers, to_slice("Content-Length: "));
       str_fixed_append_long(&response->headers, response->body.s.len);
