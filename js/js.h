@@ -8,8 +8,9 @@ typedef struct {
   kv_i kv;
   srv_request_i request;
   srv_response_i response;
+  str_t kv_prefix;
 } js_options_t;
 
-void js_run(js_options_t options);
+int js_run(allocator_t allocator, js_options_t options);
 
 #endif
