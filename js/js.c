@@ -134,11 +134,13 @@ void js_delete(js_t *self) {
   self->allocator.free(self);
 }
 
-int js_run(js_t *self, str_slice_t module) {
+int js_run(js_t *self) {
   JSContext *ctx = self->context;
   JSValue fun, eval_result, ns, fn, ret, json_val;
   JSContext *ctx1;
   JSModuleDef *m;
+  str_slice_t module;
+
   str_slice_t method;
   const char *fn_name;
   const char *body_cstr;
@@ -146,6 +148,7 @@ int js_run(js_t *self, str_slice_t module) {
   str_t file_key, code;
   char *code_cstr, *name_cstr;
 
+  module = to_slice("index.mjs");
   str_init(self->allocator, &file_key, to_slice("_js.f."));
   str_append(self->allocator, &file_key, module);
   str_init(self->allocator, &code, to_slice(""));
@@ -176,15 +179,22 @@ int js_run(js_t *self, str_slice_t module) {
   }
   JS_FreeValue(ctx, eval_result);
 
-  while (JS_ExecutePendingJob(self->runtime, &ctx1) > 0) {}
+  while (JS_ExecutePendingJob(self->runtime, &ctx1) > 0) {
+  }
 
   method = srv_request_get_method(self->request);
-  if      (str_slice_eq(method, to_slice("GET")))     fn_name = "get";
-  else if (str_slice_eq(method, to_slice("POST")))    fn_name = "post";
-  else if (str_slice_eq(method, to_slice("PUT")))     fn_name = "put";
-  else if (str_slice_eq(method, to_slice("DELETE")))  fn_name = "destroy";
-  else if (str_slice_eq(method, to_slice("OPTIONS"))) fn_name = "options";
-  else return -1;
+  if (str_slice_eq(method, to_slice("GET")))
+    fn_name = "get";
+  else if (str_slice_eq(method, to_slice("POST")))
+    fn_name = "post";
+  else if (str_slice_eq(method, to_slice("PUT")))
+    fn_name = "put";
+  else if (str_slice_eq(method, to_slice("DELETE")))
+    fn_name = "destroy";
+  else if (str_slice_eq(method, to_slice("OPTIONS")))
+    fn_name = "options";
+  else
+    return -1;
 
   ns = JS_GetModuleNamespace(ctx, m);
   fn = JS_GetPropertyStr(ctx, ns, fn_name);

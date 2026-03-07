@@ -2,8 +2,8 @@
 #define serve_internal_h_INCLUDED
 #include "serve.h"
 
-#include <picohttpparser.h>
-#include <uv.h>
+#include <vendor/picohttpparser/picohttpparser.h>
+#include <vendor/libuv/include/uv.h>
 
 typedef struct srv_s {
   allocator_t allocator;

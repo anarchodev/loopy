@@ -66,7 +66,7 @@ LOG_OBJS = log/log.o
 
 ALLOCATOR_OBJS = allocator/allocator.o
 
-STR_OBJS = str/str.o str/fixed.o str/slice_list.o
+STR_OBJS = str/str.o str/fixed.o
 $(STR_OBJS): str/str.h
 
 BASE64_OBJS = base64/base64.o
@@ -84,7 +84,7 @@ kv/%: CFLAGS=-I. -std=gnu23 -Ivendor/sqlite $(CFLAGS_MODE)
 KV_OBJS = kv/kv.o
 $(KV_OBJS): kv/kv.h $(SQLITE_A)
 
-js/%: CFLAGS=-I. -std=gnu89 -pedantic -Ivendor/quickjs $(CFLAGS_MODE)
+js/%: CFLAGS=-I. -std=gnu23 -pedantic -Ivendor/quickjs $(CFLAGS_MODE)
 JS_OBJS=js/js.o
 $(JS_OBJS): $(QUICKJS_A) js/js.h js/js_internal.h
 
@@ -126,11 +126,13 @@ coverage: test
 	@echo "open coverage_html/index.html"
 
 SERVE_TEST_OBJS = serve/test.o
+SERVE_TEST_UTILS_OBJS = serve/srv_test_utils.o
 $(SERVE_TEST_OBJS): serve/serve.h serve/serve_internal.h
+$(SERVE_TEST_UTILS_OBJS): serve/serve_internal.h serve/test.h
 
 serve-test: bin/serve-test
 
-bin/serve-test: $(SERVE_TEST_OBJS) serve/req.o serve/res.o \
+bin/serve-test: $(SERVE_TEST_OBJS) $(SERVE_TEST_UTILS_OBJS) serve/req.o serve/res.o \
 	        vendor/picohttpparser/picohttpparser.o \
 	        $(STR_OBJS) $(ALLOCATOR_OBJS)
 	$(CC) $(LDFLAGS) $^ -o $@
@@ -141,7 +143,7 @@ $(JS_TEST_OBJS): js/js.h js/js_internal.h
 js-test: bin/js-test
 
 bin/js-test: $(JS_TEST_OBJS) $(JS_OBJS) $(KV_OBJS) $(SQLITE_A) $(STR_OBJS) \
-	     $(BASE64_OBJS) $(ALLOCATOR_OBJS) $(QUICKJS_A) serve/req.o serve/res.o
+	     $(BASE64_OBJS) $(ALLOCATOR_OBJS) $(QUICKJS_A) $(SERVE_TEST_UTILS_OBJS) serve/req.o serve/res.o
 	$(CC) $(LDFLAGS) $^ -lm -o $@
 
 KV_TEST_OBJS = kv/test.o

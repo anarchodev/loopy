@@ -33,6 +33,10 @@ int srv_response_body_append(srv_response_t *self, str_slice_t body) {
   return str_fixed_append(&self->body, body);
 }
 
+str_slice_t srv_response_get_body(srv_response_t *self) {
+  return str_fixed_get_slice(&self->body);
+}
+
 void srv_response_delete(srv_response_t *self) {
   self->allocator.free(self);
 }

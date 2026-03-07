@@ -33,6 +33,7 @@ void srv_response_delete(srv_response_i);
 void srv_response_status_set(srv_response_i, int status);
 int srv_response_body_append(srv_response_i, str_slice_t body);
 int srv_response_headers_append(srv_response_i, str_slice_t header);
+str_slice_t srv_response_get_body(srv_response_i self);
 
 str_slice_t srv_request_get_method(srv_request_i);
 str_slice_t srv_request_get_body(srv_request_i);

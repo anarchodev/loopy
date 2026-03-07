@@ -1,8 +1,8 @@
+#include "serve/test.h"
 #include "allocator/allocator.h"
 #include "js/js.h"
 #include "kv/kv.h"
 #include "serve/serve.h"
-#include "serve/serve_internal.h"
 #include "str/str.h"
 #include <assert.h>
 #include <string.h>
@@ -12,7 +12,7 @@ static const char *INDEX_MJS =
     "export function post() { return { ok: true }; }\n";
 
 static js_i make_js(allocator_t a, kv_i kv,
-                    srv_request_t *req, srv_response_t *res) {
+                    srv_request_i req, srv_response_i res) {
   js_options_t opts;
   opts.kv       = kv;
   opts.request  = req;
@@ -23,8 +23,8 @@ static js_i make_js(allocator_t a, kv_i kv,
 static void test_get_returns_string(void) {
   allocator_t a = allocator_default();
   kv_i kv;
-  srv_request_t *req;
-  srv_response_t *res;
+  srv_request_i req;
+  srv_response_i res;
   js_i js;
 
   kv = kv_new(a);
@@ -32,12 +32,12 @@ static void test_get_returns_string(void) {
          str_cstring_to_slice(INDEX_MJS, strlen(INDEX_MJS)));
 
   req = srv_request_new(a, NULL);
-  req->method = to_slice("GET");
+  srv_request_set_method(req, to_slice("GET"));
   res = srv_response_new(a);
 
   js = make_js(a, kv, req, res);
-  assert(js_run(js, to_slice("index.mjs")) == 0);
-  assert(str_slice_eq(res->body.s, to_slice("hello")));
+  assert(js_run(js) == 0);
+  assert(str_slice_eq(srv_response_get_body(res), to_slice("hello")));
 
   js_delete(js);
   srv_request_delete(req);
@@ -48,8 +48,8 @@ static void test_get_returns_string(void) {
 static void test_post_returns_json(void) {
   allocator_t a = allocator_default();
   kv_i kv;
-  srv_request_t *req;
-  srv_response_t *res;
+  srv_request_i req;
+  srv_response_i res;
   js_i js;
 
   kv = kv_new(a);
@@ -57,12 +57,12 @@ static void test_post_returns_json(void) {
          str_cstring_to_slice(INDEX_MJS, strlen(INDEX_MJS)));
 
   req = srv_request_new(a, NULL);
-  req->method = to_slice("POST");
+  srv_request_set_method(req, to_slice("POST"));
   res = srv_response_new(a);
 
   js = make_js(a, kv, req, res);
-  assert(js_run(js, to_slice("index.mjs")) == 0);
-  assert(str_slice_eq(res->body.s, to_slice("{\"ok\":true}")));
+  assert(js_run(js) == 0);
+  assert(str_slice_eq(srv_response_get_body(res), to_slice("{\"ok\":true}")));
 
   js_delete(js);
   srv_request_delete(req);
@@ -73,8 +73,8 @@ static void test_post_returns_json(void) {
 static void test_unknown_method_returns_error(void) {
   allocator_t a = allocator_default();
   kv_i kv;
-  srv_request_t *req;
-  srv_response_t *res;
+  srv_request_i req;
+  srv_response_i res;
   js_i js;
 
   kv = kv_new(a);
@@ -82,11 +82,11 @@ static void test_unknown_method_returns_error(void) {
          str_cstring_to_slice(INDEX_MJS, strlen(INDEX_MJS)));
 
   req = srv_request_new(a, NULL);
-  req->method = to_slice("PATCH");
+  srv_request_set_method(req, to_slice("PATCH"));
   res = srv_response_new(a);
 
   js = make_js(a, kv, req, res);
-  assert(js_run(js, to_slice("index.mjs")) == -1);
+  assert(js_run(js) == -1);
 
   js_delete(js);
   srv_request_delete(req);
