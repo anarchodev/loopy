@@ -22,6 +22,9 @@ clean:
 	       -not -path "./vendor*" -exec rm {} \;
 	rm -rf bin/* coverage.info coverage_html
 
+clean-vendor:
+	find vendor -maxdepth 1 -mindepth 1 -type d -exec sh -c "cd {}; git clean -fxd" \;
+
 ## vendor
 UV_A = vendor/libuv/build/libuv.a
 URIPARSER_A = vendor/uriparser/build/liburiparser.a
@@ -34,10 +37,10 @@ vendor/sqlite/configure:
 	git submodule update --init --recursive
 
 $(UV_A):
-	cd vendor/libuv && cmake -B build && cmake --build build
+	cd vendor/libuv && cmake -B build && cmake --build build --parallel $(nproc)
 
 $(QUICKJS_A):
-	cd vendor/quickjs && cmake -B build && cmake --build build
+	cd vendor/quickjs && cmake -B build && cmake --build build --parallel $(nproc)
 
 $(URIPARSER_A):
 	cd vendor/uriparser && cmake -B build \
@@ -46,13 +49,14 @@ $(URIPARSER_A):
 	  -DURIPARSER_BUILD_TESTS=OFF \
 	  -DURIPARSER_BUILD_TOOLS=OFF \
 	  -DURIPARSER_BUILD_WCHAR_T=OFF \
-	  && cmake --build build
+	  && cmake --build build --parallel $(nproc)
 
 $(SQLITE_A): vendor/sqlite/configure
-	cd vendor/sqlite && ./configure && $(MAKE) MAKELEVEL=0
+	cd vendor/sqlite && ./configure && $(MAKE) MAKELEVEL=0 -j $(nproc)
 
 $(PQ_A):
-	cd vendor/postgres && ./configure && $(MAKE) -C src/interfaces/libpq MAKELEVEL=0
+	cd vendor/postgres && ./configure && \
+	$(MAKE) -C src/interfaces/libpq MAKELEVEL=0 -j $(nproc)
 
 vendor/picohttpparser/%: CFLAGS=-I. -std=gnu23 -Ivendor/libuv/include \
                          -Ivendor/picohttpparser $(CFLAGS_MODE)
@@ -62,7 +66,7 @@ LOG_OBJS = log/log.o
 
 ALLOCATOR_OBJS = allocator/allocator.o
 
-STR_OBJS = str/str.o str/fixed.o
+STR_OBJS = str/str.o str/fixed.o str/slice_list.o
 $(STR_OBJS): str/str.h
 
 BASE64_OBJS = base64/base64.o
@@ -78,9 +82,9 @@ $(SERVE_OBJS): $(UV_A) serve/serve.h serve/serve_internal.h
 
 kv/%: CFLAGS=-I. -std=gnu23 -Ivendor/sqlite $(CFLAGS_MODE)
 KV_OBJS = kv/kv.o
-$(KV_OBJS): kv/kv.h
+$(KV_OBJS): kv/kv.h $(SQLITE_A)
 
-js/%: CFLAGS=-I. -std=gnu23 -Ivendor/quickjs $(CFLAGS_MODE)
+js/%: CFLAGS=-I. -std=gnu89 -pedantic -Ivendor/quickjs $(CFLAGS_MODE)
 JS_OBJS=js/js.o
 $(JS_OBJS): $(QUICKJS_A) js/js.h js/js_internal.h
 
