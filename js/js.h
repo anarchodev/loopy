@@ -5,12 +5,16 @@
 #include "serve/serve.h"
 
 typedef struct {
-  kv_i kv;
   srv_request_i request;
   srv_response_i response;
-  str_t kv_prefix;
+  kv_i kv;
 } js_options_t;
 
-int js_run(allocator_t allocator, js_options_t options);
+typedef struct js_s *js_i;
+
+js_i js_new(allocator_t allocator, js_options_t options);
+void js_delete(js_i);
+
+int js_run(js_i self);
 
 #endif

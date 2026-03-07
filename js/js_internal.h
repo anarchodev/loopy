@@ -1,20 +1,28 @@
 #ifndef js_internal_h_INCLUDED
 #define js_internal_h_INCLUDED
 
-#include "js/js.h"
 #include "kv/kv.h"
-#include "str/str.h"
+#include "serve/serve.h"
+
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wdeclaration-after-statement"
+#endif
+
 #include <quickjs.h>
 
-typedef struct {
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
+
+typedef struct js_s {
     allocator_t allocator;
     JSRuntime*runtime;
     JSContext*context;
     kv_i kv;
-    str_t kv_prefix;
+    srv_request_i request;
+    srv_response_i response;
 }js_t;
-
-js_t *js_new(allocator_t, js_options_t);
-void js_delete(js_t *);
 
 #endif
