@@ -9,10 +9,10 @@
 #include <assert.h>
 #include <string.h>
 
-static JSModuleDef *try_load_bytecode(js_t *js, JSContext *ctx,
-                                      str_slice_t bc_key) {
+static JSValue try_load_bytecode(js_t *js, JSContext *ctx,
+                                  str_slice_t bc_key) {
   str_t bc_b64;
-  JSModuleDef *m = NULL;
+  JSValue result = JS_UNDEFINED;
 
   str_init(js->allocator, &bc_b64, to_slice(""));
   kv_get(js->kv, bc_key, &bc_b64);
@@ -22,14 +22,11 @@ static JSModuleDef *try_load_bytecode(js_t *js, JSContext *ctx,
     unsigned char *buf = js->allocator.malloc(buf_len);
     int decoded = base64_decode(bc_b64.slice.ptr, bc_b64.slice.len, buf);
     if (decoded > 0) {
-      JSValue result =
-          JS_ReadObject(ctx, buf, (size_t)decoded, JS_READ_OBJ_BYTECODE);
+      result = JS_ReadObject(ctx, buf, (size_t)decoded, JS_READ_OBJ_BYTECODE);
       js->allocator.free(buf);
-      if (!JS_IsException(result)) {
-        m = JS_VALUE_GET_PTR(result);
+      if (JS_IsException(result)) {
         JS_FreeValue(ctx, result);
-      } else {
-        JS_FreeValue(ctx, result);
+        result = JS_UNDEFINED;
       }
     } else {
       js->allocator.free(buf);
@@ -37,7 +34,7 @@ static JSModuleDef *try_load_bytecode(js_t *js, JSContext *ctx,
   }
 
   str_deinit(js->allocator, &bc_b64);
-  return m;
+  return result;
 }
 
 static void store_bytecode(js_t *js, JSContext *ctx, JSValue result,
@@ -55,30 +52,26 @@ static void store_bytecode(js_t *js, JSContext *ctx, JSValue result,
   }
 }
 
-JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
-                              void *opaque) {
-  JSValue result;
-  char *code_cstring;
-  JSModuleDef *m;
-  js_t *js = opaque;
+static JSValue load_module(js_t *js, JSContext *ctx, const char *module_name) {
+  str_slice_t module_name_slice;
   str_t bc_key;
   str_t file_key;
   str_t code;
-  str_slice_t module_name_slice;
+  char *code_cstring;
+  JSValue result;
 
   module_name_slice = str_cstring_to_slice(module_name, strlen(module_name));
 
-  str_init(js->allocator, &bc_key, to_slice("_js"));
-  str_append(js->allocator, &bc_key, to_slice(".b."));
+  str_init(js->allocator, &bc_key, to_slice("_js.b."));
   str_append(js->allocator, &bc_key, module_name_slice);
 
-  m = try_load_bytecode(js, ctx, bc_key.slice);
-  if (m) {
+  result = try_load_bytecode(js, ctx, bc_key.slice);
+  if (!JS_IsUndefined(result)) {
     str_deinit(js->allocator, &bc_key);
-    return m;
+    return result;
   }
-  str_init(js->allocator, &file_key, to_slice("_js"));
-  str_append(js->allocator, &file_key, to_slice(".f."));
+
+  str_init(js->allocator, &file_key, to_slice("_js.f."));
   str_append(js->allocator, &file_key, module_name_slice);
 
   str_init(js->allocator, &code, to_slice(""));
@@ -87,7 +80,7 @@ JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
 
   code_cstring = js->allocator.malloc(code.slice.len + 1);
   str_to_cstring(&code, code_cstring);
-  result = JS_Eval(js->context, code_cstring, code.slice.len, module_name,
+  result = JS_Eval(ctx, code_cstring, code.slice.len, module_name,
                    JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
   js->allocator.free(code_cstring);
   str_deinit(js->allocator, &code);
@@ -99,15 +92,131 @@ JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
     JS_FreeCString(ctx, error);
     JS_FreeValue(ctx, exception);
     str_deinit(js->allocator, &bc_key);
-    return NULL;
+    return result;
   }
 
   store_bytecode(js, ctx, result, bc_key.slice);
   str_deinit(js->allocator, &bc_key);
+  return result;
+}
 
-  m = JS_VALUE_GET_PTR(result);
-  JS_FreeValue(ctx, result);
+JSModuleDef *kv_module_loader(JSContext *ctx, const char *module_name,
+                              void *opaque) {
+  js_t *js = opaque;
+  JSValue val = load_module(js, ctx, module_name);
+  JSModuleDef *m;
+  if (JS_IsException(val))
+    return NULL;
+  m = JS_VALUE_GET_PTR(val);
+  JS_FreeValue(ctx, val);
   return m;
+}
+
+static JSValue js_kv_get_item(JSContext *ctx, JSValueConst this_val,
+                               int argc, JSValueConst *argv) {
+  js_t *js = JS_GetContextOpaque(ctx);
+  const char *key_cstr;
+  size_t key_len;
+  str_t result;
+  JSValue ret;
+
+  (void)this_val;
+  if (argc < 1 || !JS_IsString(argv[0]))
+    return JS_UNDEFINED;
+
+  key_cstr = JS_ToCStringLen(ctx, &key_len, argv[0]);
+  str_init(js->allocator, &result, to_slice(""));
+  kv_get(js->kv, str_cstring_to_slice(key_cstr, (unsigned long)key_len), &result);
+  JS_FreeCString(ctx, key_cstr);
+
+  ret = JS_NewStringLen(ctx, result.slice.ptr, result.slice.len);
+  str_deinit(js->allocator, &result);
+  return ret;
+}
+
+static JSValue js_kv_set_item(JSContext *ctx, JSValueConst this_val,
+                               int argc, JSValueConst *argv) {
+  js_t *js = JS_GetContextOpaque(ctx);
+  const char *key_cstr, *val_cstr;
+  size_t key_len, val_len;
+
+  (void)this_val;
+  if (argc < 2 || !JS_IsString(argv[0]) || !JS_IsString(argv[1]))
+    return JS_UNDEFINED;
+
+  key_cstr = JS_ToCStringLen(ctx, &key_len, argv[0]);
+  val_cstr = JS_ToCStringLen(ctx, &val_len, argv[1]);
+  kv_set(js->kv, str_cstring_to_slice(key_cstr, (unsigned long)key_len),
+                 str_cstring_to_slice(val_cstr, (unsigned long)val_len));
+  JS_FreeCString(ctx, val_cstr);
+  JS_FreeCString(ctx, key_cstr);
+  return JS_UNDEFINED;
+}
+
+static JSValue js_kv_remove_item(JSContext *ctx, JSValueConst this_val,
+                                  int argc, JSValueConst *argv) {
+  js_t *js = JS_GetContextOpaque(ctx);
+  const char *key_cstr;
+  size_t key_len;
+
+  (void)this_val;
+  if (argc < 1 || !JS_IsString(argv[0]))
+    return JS_UNDEFINED;
+
+  key_cstr = JS_ToCStringLen(ctx, &key_len, argv[0]);
+  kv_remove(js->kv, str_cstring_to_slice(key_cstr, (unsigned long)key_len));
+  JS_FreeCString(ctx, key_cstr);
+  return JS_UNDEFINED;
+}
+
+static void js_setup_kv_global(js_t *self) {
+  JSContext *ctx = self->context;
+  JSValue global = JS_GetGlobalObject(ctx);
+  JSValue kv_obj = JS_NewObject(ctx);
+
+  JS_SetPropertyStr(ctx, kv_obj, "getItem",
+      JS_NewCFunction(ctx, js_kv_get_item, "getItem", 1));
+  JS_SetPropertyStr(ctx, kv_obj, "setItem",
+      JS_NewCFunction(ctx, js_kv_set_item, "setItem", 2));
+  JS_SetPropertyStr(ctx, kv_obj, "removeItem",
+      JS_NewCFunction(ctx, js_kv_remove_item, "removeItem", 1));
+
+  JS_SetPropertyStr(ctx, global, "KV", kv_obj);
+  JS_FreeValue(ctx, global);
+}
+
+static void js_setup_request_global(js_t *self) {
+  JSContext *ctx = self->context;
+  JSValue global = JS_GetGlobalObject(ctx);
+  JSValue req_obj = JS_NewObject(ctx);
+  str_slice_t method = srv_request_get_method(self->request);
+  str_slice_t path   = srv_request_get_path(self->request);
+  str_slice_t body   = srv_request_get_body(self->request);
+
+  JS_SetPropertyStr(ctx, req_obj, "method",
+      JS_NewStringLen(ctx, method.ptr, method.len));
+  JS_SetPropertyStr(ctx, req_obj, "path",
+      JS_NewStringLen(ctx, path.ptr, path.len));
+  JS_SetPropertyStr(ctx, req_obj, "body",
+      JS_NewStringLen(ctx, body.ptr, body.len));
+
+  {
+    size_t i;
+    size_t count = srv_request_get_header_count(self->request);
+    JSValue headers_obj = JS_NewObject(ctx);
+    for (i = 0; i < count; i++) {
+      str_slice_t name  = srv_request_get_header_name(self->request, i);
+      str_slice_t value = srv_request_get_header_value(self->request, i);
+      JSAtom atom = JS_NewAtomLen(ctx, name.ptr, name.len);
+      JS_SetProperty(ctx, headers_obj, atom,
+          JS_NewStringLen(ctx, value.ptr, value.len));
+      JS_FreeAtom(ctx, atom);
+    }
+    JS_SetPropertyStr(ctx, req_obj, "headers", headers_obj);
+  }
+
+  JS_SetPropertyStr(ctx, global, "REQUEST", req_obj);
+  JS_FreeValue(ctx, global);
 }
 
 js_t *js_new(allocator_t allocator, js_options_t options) {
@@ -121,6 +230,8 @@ js_t *js_new(allocator_t allocator, js_options_t options) {
   self->kv = options.kv;
   self->request = options.request;
   self->response = options.response;
+  js_setup_kv_global(self);
+  js_setup_request_global(self);
 #ifndef NDEBUG
   JS_SetDumpFlags(self->runtime, JS_DUMP_MODULE_RESOLVE);
 #endif
@@ -139,35 +250,13 @@ int js_run(js_t *self) {
   JSValue fun, eval_result, ns, fn, ret, json_val;
   JSContext *ctx1;
   JSModuleDef *m;
-  str_slice_t module;
 
   str_slice_t method;
   const char *fn_name;
   const char *body_cstr;
   size_t body_len;
-  str_t file_key, code;
-  char *code_cstr, *name_cstr;
 
-  module = to_slice("index.mjs");
-  str_init(self->allocator, &file_key, to_slice("_js.f."));
-  str_append(self->allocator, &file_key, module);
-  str_init(self->allocator, &code, to_slice(""));
-  kv_get(self->kv, file_key.slice, &code);
-  str_deinit(self->allocator, &file_key);
-
-  code_cstr = self->allocator.malloc(code.slice.len + 1);
-  str_to_cstring(&code, code_cstr);
-
-  name_cstr = self->allocator.malloc(module.len + 1);
-  memcpy(name_cstr, module.ptr, module.len);
-  name_cstr[module.len] = '\0';
-
-  fun = JS_Eval(ctx, code_cstr, code.slice.len, name_cstr,
-                JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
-  self->allocator.free(code_cstr);
-  self->allocator.free(name_cstr);
-  str_deinit(self->allocator, &code);
-
+  fun = load_module(self, ctx, "index.mjs");
   if (JS_IsException(fun))
     return -1;
 
@@ -211,6 +300,20 @@ int js_run(js_t *self) {
   if (JS_IsException(ret)) {
     JS_FreeValue(ctx, ret);
     return -1;
+  }
+
+  if (JS_IsPromise(ret)) {
+    while (JS_PromiseState(ctx, ret) == JS_PROMISE_PENDING &&
+           JS_ExecutePendingJob(self->runtime, &ctx1) > 0) {
+    }
+    if (JS_PromiseState(ctx, ret) == JS_PROMISE_FULFILLED) {
+      JSValue resolved = JS_PromiseResult(ctx, ret);
+      JS_FreeValue(ctx, ret);
+      ret = resolved;
+    } else {
+      JS_FreeValue(ctx, ret);
+      return -1;
+    }
   }
 
   if (JS_IsString(ret)) {

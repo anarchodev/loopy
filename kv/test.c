@@ -12,6 +12,13 @@ int main() {
 
     kv_get(kv, to_slice("foo"), &val);
 
+    kv_remove(kv, to_slice("foo"));
+    str_deinit(allocator_default(), &val);
+    str_init(allocator_default(), &val, to_slice(""));
+    kv_get(kv, to_slice("foo"), &val);
+    assert(val.slice.len == 0);  /* key no longer exists */
+
+    str_deinit(allocator_default(), &val);
     kv_delete(kv);
     return 0;
 }

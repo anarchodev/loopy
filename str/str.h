@@ -45,5 +45,9 @@ int str_fixed_append(str_fixed_t *const self, str_slice_t slice);
 int str_fixed_append_long(str_fixed_t *const self, long data);
 str_slice_t str_fixed_get_slice(str_fixed_t const*const self);
 unsigned long str_fixed_len(str_fixed_t const*const self);
+/* out must be at least self->s.len + 1 bytes.
+ * When using the same array as the backing buffer, initialize with
+ * sizeof buf - 1 capacity to leave room for the NUL terminator. */
+void str_fixed_to_cstring(str_fixed_t const *self, char *out);
 
 #endif

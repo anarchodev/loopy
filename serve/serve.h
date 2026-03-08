@@ -36,8 +36,12 @@ int srv_response_headers_append(srv_response_i, str_slice_t header);
 str_slice_t srv_response_get_body(srv_response_i self);
 
 str_slice_t srv_request_get_method(srv_request_i);
+str_slice_t srv_request_get_path(srv_request_i);
 str_slice_t srv_request_get_body(srv_request_i);
 str_slice_t srv_request_get_buffer(srv_request_i);
+size_t      srv_request_get_header_count(srv_request_i);
+str_slice_t srv_request_get_header_name(srv_request_i, size_t idx);
+str_slice_t srv_request_get_header_value(srv_request_i, size_t idx);
 void srv_request_reset(srv_request_i self);
 
 #endif

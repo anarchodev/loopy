@@ -9,7 +9,7 @@ srv_request_t *srv_request_new(allocator_t allocator, srv_request_cb cb) {
   srv_request_t *self = allocator.malloc(sizeof(*self));
   if (self == NULL)
     return self;
-  self->headers_count = sizeof(self->headers) / sizeof(self->headers[0]);
+  self->headers_count = 0;
   self->allocator = allocator;
   self->request_cb = cb;
   self->headers_parsed = 0;
@@ -26,10 +26,26 @@ void srv_request_delete(srv_request_t *self) { self->allocator.free(self); }
 
 str_slice_t srv_request_get_method(srv_request_i self) { return self->method; }
 
+str_slice_t srv_request_get_path(srv_request_i self) { return self->path; }
+
 str_slice_t srv_request_get_body(srv_request_i self) { return self->body; }
 
 str_slice_t srv_request_get_buffer(srv_request_i self) {
   return self->buffer.s;
+}
+
+size_t srv_request_get_header_count(srv_request_i self) {
+  return self->headers_count;
+}
+
+str_slice_t srv_request_get_header_name(srv_request_i self, size_t idx) {
+  return str_cstring_to_slice(self->headers[idx].name,
+                              (unsigned long)self->headers[idx].name_len);
+}
+
+str_slice_t srv_request_get_header_value(srv_request_i self, size_t idx) {
+  return str_cstring_to_slice(self->headers[idx].value,
+                              (unsigned long)self->headers[idx].value_len);
 }
 
 void srv_request_reset(srv_request_i self) {
@@ -51,5 +67,5 @@ void srv_request_reset(srv_request_i self) {
   self->path = str_slice(NULL, 0);
   self->buffer_previous_len = 0;
   memset(self->headers, 0, sizeof self->headers);
-  self->headers_count = sizeof(self->headers) / sizeof(self->headers[0]);
+  self->headers_count = 0;
 }

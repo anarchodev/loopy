@@ -8,11 +8,9 @@
 typedef struct kv_s {
   allocator_t allocator;
   sqlite3 *db;
+  sqlite3_stmt *get_stmt;
+  sqlite3_stmt *set_stmt;
+  sqlite3_stmt *remove_stmt;
 } kv_t;
-
-typedef struct kv_result_s {
-    str_t *result;
-    allocator_t allocator;
-} kv_result_t;
 
 #endif

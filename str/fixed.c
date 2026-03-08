@@ -32,3 +32,8 @@ int str_fixed_append_long(str_fixed_t *self, long num) {
 str_slice_t str_fixed_get_slice(str_fixed_t const*const self) { return self->s; }
 
 unsigned long str_fixed_len(str_fixed_t const*const self) { return self->s.len; }
+
+void str_fixed_to_cstring(str_fixed_t const *self, char *out) {
+  memcpy(out, self->s.ptr, self->s.len);
+  out[self->s.len] = '\0';
+}

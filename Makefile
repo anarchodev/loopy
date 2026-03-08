@@ -89,13 +89,14 @@ JS_OBJS=js/js.o
 $(JS_OBJS): $(QUICKJS_A) js/js.h js/js_internal.h
 
 ## programs
-LOOPY_OBJS = loopy/main.o loopy/args.o
+LOOPY_OBJS = loopy/main.o loopy/args.o loopy/load.o
 $(LOOPY_OBJS): loopy/internal.h
 
 loopy: bin/loopy
              
 bin/loopy: $(LOOPY_OBJS) $(KV_OBJS) $(ALLOCATOR_OBJS) $(STR_OBJS) \
-	   $(BASE64_OBJS) $(SERVE_OBJS) $(LOG_OBJS) $(UV_A) $(QUICKJS_A) $(SQLITE_A) $(URIPARSER_A)
+	   $(BASE64_OBJS) $(SERVE_OBJS) $(LOG_OBJS) $(UV_A) $(QUICKJS_A) \
+ 	   $(SQLITE_A) $(URIPARSER_A) $(JS_OBJS)
 	$(CC) $(LDFLAGS) $^ -lm -o $@
 
 LOOPY_TEST_OBJS = loopy/test.o

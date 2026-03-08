@@ -11,5 +11,6 @@ void kv_delete(kv_i self);
 
 int kv_get(kv_i self, str_slice_t key, str_t *result);
 int kv_set(kv_i self, str_slice_t key, str_slice_t val);
+int kv_remove(kv_i self, str_slice_t key);
 
 #endif

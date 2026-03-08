@@ -3,32 +3,39 @@
 #include "str/str.h"
 #include <sqlite3.h>
 #include <stdio.h>
-#include <string.h>
 
 kv_i kv_new(allocator_t allocator) {
-    kv_i self;
+  kv_i self;
   const char *sql =
       "CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT)";
   char *err_msg = 0;
   self = allocator.malloc(sizeof *self);
   self->allocator = allocator;
+  self->get_stmt = NULL;
+  self->set_stmt = NULL;
+  self->remove_stmt = NULL;
 
   int rc = sqlite3_open("db.db", &self->db);
   if (rc != SQLITE_OK) {
-
     fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(self->db));
     goto fail;
   }
+
   rc = sqlite3_exec(self->db, sql, NULL, NULL, &err_msg);
-
   if (rc != SQLITE_OK) {
-
-    fprintf(stderr, "Failed to select data\n");
+    fprintf(stderr, "Failed to create table\n");
     fprintf(stderr, "SQL error: %s\n", err_msg);
-
     sqlite3_free(err_msg);
     goto fail;
   }
+
+  sqlite3_prepare_v2(self->db,
+      "SELECT value FROM kv WHERE key = ?", -1, &self->get_stmt, NULL);
+  sqlite3_prepare_v2(self->db,
+      "INSERT INTO kv(key, value) VALUES (?, ?) "
+      "ON CONFLICT (key) DO UPDATE SET value=excluded.value", -1, &self->set_stmt, NULL);
+  sqlite3_prepare_v2(self->db,
+      "DELETE FROM kv WHERE key = ?", -1, &self->remove_stmt, NULL);
 
   return self;
 
@@ -38,69 +45,47 @@ fail:
 }
 
 void kv_delete(kv_i self) {
+  sqlite3_finalize(self->get_stmt);
+  sqlite3_finalize(self->set_stmt);
+  sqlite3_finalize(self->remove_stmt);
   sqlite3_close(self->db);
   self->allocator.free(self);
 }
 
-int callback(void *result, int argc, char **argv, char **azColName) {
-  (void)(azColName);
-  (void)(argc);
-
-  kv_result_t*res = result;
-
-  str_append(res->allocator, res->result, str_cstring_to_slice(argv[0], strlen(argv[0])));
-
-  return 0;
-}
-
 int kv_get(kv_i self, str_slice_t key, str_t *result) {
   int rc;
-  char *err_msg;
-  char *query_cstring;
-  str_t query;
-  kv_result_t container;
-  str_init(self->allocator, &query,
-           to_slice("SELECT value FROM kv WHERE key = \""));
-  str_append(self->allocator, &query, key);
-  str_append(self->allocator, &query, to_slice("\";"));
-
-  query_cstring = self->allocator.malloc(query.slice.len + 1);
-
-  str_to_cstring(&query, query_cstring);
-
-  container.allocator=self->allocator;
-  container.result = result;
-
-  rc = sqlite3_exec(self->db, query_cstring, callback, &container, &err_msg);
-
-  self->allocator.free(query_cstring);
-
-  str_deinit(self->allocator, &query);
+  sqlite3_bind_text(self->get_stmt, 1, key.ptr, (int)key.len, SQLITE_STATIC);
+  rc = sqlite3_step(self->get_stmt);
+  if (rc == SQLITE_ROW) {
+    const char *val = (const char *)sqlite3_column_text(self->get_stmt, 0);
+    int len = sqlite3_column_bytes(self->get_stmt, 0);
+    str_append(self->allocator, result, str_cstring_to_slice(val, len));
+    rc = SQLITE_OK;
+  } else if (rc == SQLITE_DONE) {
+    rc = SQLITE_OK;
+  }
+  sqlite3_reset(self->get_stmt);
+  sqlite3_clear_bindings(self->get_stmt);
   return rc;
 }
 
 int kv_set(kv_i self, str_slice_t key, str_slice_t val) {
   int rc;
-  char *err_msg;
-  char *query_cstring;
-  str_t query;
-  str_init(self->allocator, &query,
-           to_slice("INSERT INTO kv(key, value) VALUES (\""));
-  str_append(self->allocator, &query, key);
-  str_append(self->allocator, &query, to_slice("\", \""));
-  str_append(self->allocator, &query, val);
-  str_append(
-      self->allocator, &query,
-      to_slice("\") ON CONFLICT (key) DO UPDATE SET value=excluded.value;"));
+  sqlite3_bind_text(self->set_stmt, 1, key.ptr, (int)key.len, SQLITE_STATIC);
+  sqlite3_bind_text(self->set_stmt, 2, val.ptr, (int)val.len, SQLITE_STATIC);
+  rc = sqlite3_step(self->set_stmt);
+  if (rc == SQLITE_DONE) rc = SQLITE_OK;
+  sqlite3_reset(self->set_stmt);
+  sqlite3_clear_bindings(self->set_stmt);
+  return rc;
+}
 
-  query_cstring = self->allocator.malloc(query.slice.len + 1);
-
-  str_to_cstring(&query, query_cstring);
-
-  rc = sqlite3_exec(self->db, query_cstring, callback, NULL, &err_msg);
-
-  self->allocator.free(query_cstring);
-
-  str_deinit(self->allocator, &query);
+int kv_remove(kv_i self, str_slice_t key) {
+  int rc;
+  sqlite3_bind_text(self->remove_stmt, 1, key.ptr, (int)key.len, SQLITE_STATIC);
+  rc = sqlite3_step(self->remove_stmt);
+  if (rc == SQLITE_DONE) rc = SQLITE_OK;
+  sqlite3_reset(self->remove_stmt);
+  sqlite3_clear_bindings(self->remove_stmt);
   return rc;
 }

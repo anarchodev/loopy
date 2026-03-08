@@ -271,6 +271,20 @@ static void test_fixed_append_long_overflow(void) {
   assert(f.s.len == 0);
 }
 
+static void test_fixed_to_cstring(void) {
+  char buf[32];
+  char out[32];
+  str_slice_t init;
+  str_fixed_t f;
+  init.ptr = buf;
+  init.len = 0;
+  f = str_fixed_init(init, sizeof buf - 1);
+  str_fixed_append(&f, to_slice("hello"));
+  str_fixed_to_cstring(&f, out);
+  assert(out[5] == '\0');
+  assert(strcmp(out, "hello") == 0);
+}
+
 /* --- OOM tests --- */
 
 static void test_str_init_oom(void) {
@@ -336,6 +350,7 @@ int main(void) {
   test_fixed_append_overflow();
   test_fixed_append_long();
   test_fixed_append_long_overflow();
+  test_fixed_to_cstring();
 
   test_str_init_oom();
   test_str_append_oom_sso_to_heap();
