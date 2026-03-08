@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>loopy client</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; display: flex; flex-direction: column; height: 100vh; }
+    #toolbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #252526; border-bottom: 1px solid #3c3c3c; }
+    #toolbar span { font-size: 13px; color: #858585; }
+    input[type="text"] { background: #3c3c3c; color: #d4d4d4; border: 1px solid #555; border-radius: 3px; padding: 4px 8px; font-family: monospace; font-size: 13px; }
+    input[type="text"]:focus { outline: none; border-color: #0e639c; }
+    #func-input { width: 200px; }
+    #param-input { width: 300px; }
+    #call-btn { padding: 4px 14px; background: #0e639c; color: #fff; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; }
+    #call-btn:hover { background: #1177bb; }
+    #call-btn:disabled { background: #3c3c3c; cursor: default; }
+    #status { font-size: 12px; color: #858585; margin-left: auto; }
+    #status.ok { color: #4ec9b0; }
+    #status.err { color: #f44747; }
+    #result-wrap { flex: 1; padding: 16px; overflow: auto; }
+    #result { white-space: pre-wrap; font-size: 14px; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <span>fn</span>
+    <input id="func-input" type="text" placeholder="function name" />
+    <span>arg</span>
+    <input id="param-input" type="text" placeholder="parameter" />
+    <button id="call-btn">Call</button>
+    <span id="status"></span>
+  </div>
+  <div id="result-wrap">
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const funcInput = document.getElementById('func-input');
+    const paramInput = document.getElementById('param-input');
+    const callBtn = document.getElementById('call-btn');
+    const statusEl = document.getElementById('status');
+    const resultEl = document.getElementById('result');
+
+    function setStatus(msg, type) {
+      statusEl.textContent = msg;
+      statusEl.className = type || '';
+    }
+
+    async function callFunc() {
+      const func = funcInput.value.trim();
+      const param = paramInput.value;
+      if (!func) { setStatus('enter a function name', 'err'); return; }
+
+      callBtn.disabled = true;
+      setStatus('calling…');
+      resultEl.textContent = '';
+
+      try {
+        const args = encodeURIComponent(JSON.stringify([param]));
+        const res = await fetch(`http://localhost:7070/?func=user_files/index.mjs:${encodeURIComponent(func)}&args=${args}`);
+        const text = await res.text();
+        resultEl.textContent = text;
+        setStatus('ok', 'ok');
+      } catch (e) {
+        setStatus('error: ' + e.message, 'err');
+      } finally {
+        callBtn.disabled = false;
+      }
+    }
+
+    callBtn.addEventListener('click', callFunc);
+    paramInput.addEventListener('keydown', e => { if (e.key === 'Enter') callFunc(); });
+  </script>
+</body>
+</html>

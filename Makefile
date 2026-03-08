@@ -1,4 +1,4 @@
-.PHONY: all clean loopy test coverage
+.PHONY: all clean loopy test coverage serve-demo
 
 BUILD ?= debug
 
@@ -155,3 +155,6 @@ kv-test: ./bin/kv-test
 bin/kv-test: $(KV_TEST_OBJS) $(KV_OBJS) $(SQLITE_A) $(STR_OBJS) \
 	     $(ALLOCATOR_OBJS)
 	$(CC) $(LDFLAGS) $^ -lm -o $@
+
+serve-demo:
+	caddy file-server --listen :8080 --root demo

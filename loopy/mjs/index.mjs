@@ -11,8 +11,7 @@ function parseQueryParam(path, name) {
   return null;
 }
 
-export async function get() {
-  const func = parseQueryParam(REQUEST.path, 'func');
+async function dispatch(func, args) {
   if (!func) return { error: 'missing func parameter' };
 
   const sep = func.indexOf(':');
@@ -25,8 +24,18 @@ export async function get() {
   if (typeof mod[fnName] !== 'function')
     return { error: `${fnName} not found in ${modulePath}` };
 
+  return mod[fnName](args[0], args[1]);
+}
+
+export async function get() {
+  const func = parseQueryParam(REQUEST.path, 'func');
   const argsParam = parseQueryParam(REQUEST.path, 'args');
   const args = argsParam ? JSON.parse(decodeURIComponent(argsParam)) : [];
+  return dispatch(func, args);
+}
 
-  return mod[fnName](args[0], args[1]);
+export async function post() {
+  const body = JSON.parse(REQUEST.body);
+  const { func, args = [] } = body;
+  return dispatch(func, args);
 }

@@ -15,6 +15,9 @@ void loopy_on_request(srv_request_i request, srv_response_i response) {
   log_info("loopy_on_request called");
 
   srv_response_status_set(response, 200);
+  srv_response_headers_append(response, to_slice("Access-Control-Allow-Origin: *"));
+  srv_response_headers_append(response, to_slice("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS"));
+  srv_response_headers_append(response, to_slice("Access-Control-Allow-Headers: Content-Type"));
 
   kv = kv_new(allocator_default());
 
